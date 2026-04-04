@@ -1,0 +1,84 @@
+/* ─── Floaty Toolbar ─────────────────────────────────────────────────────────
+   Floating selection toolbar for Obsidian – styles.css
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.floaty-toolbar {
+    position: absolute;
+    z-index: 1000;
+
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 10px;
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.18),
+        0 1px 4px  rgba(0, 0, 0, 0.10);
+
+    /* Hidden state (before animation) */
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    pointer-events: none;
+
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+/* Visible state – toggled via JS */
+.floaty-toolbar.floaty-toolbar--visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+
+.floaty-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 30px;
+    height: 30px;
+    padding: 0;
+
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+
+    transition:
+        background 100ms ease,
+        color 100ms ease,
+        transform 80ms ease;
+}
+
+.floaty-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    transform: scale(1.1);
+}
+
+.floaty-btn:active {
+    background: var(--background-modifier-active-hover);
+    transform: scale(0.95);
+}
+
+/* Ensure Lucide SVG icons scale correctly */
+.floaty-btn svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+
+/* ─── Dark theme adjustment ──────────────────────────────────────────────── */
+.theme-dark .floaty-toolbar {
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.40),
+        0 1px 6px  rgba(0, 0, 0, 0.25);
+}
