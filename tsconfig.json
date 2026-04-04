@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["DOM", "ESNext"],
+    "types": ["node"],
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*", "src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "main.js"]
+}

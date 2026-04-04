@@ -1,0 +1,10 @@
+{
+	"id": "floaty-toolbar",
+	"name": "Floaty Toolbar",
+	"version": "0.1.0",
+	"minAppVersion": "1.0.0",
+	"description": "A modern, sleek floating toolbar that appears when you select text. Style your notes with one click.",
+	"author": "0png",
+	"authorUrl": "https://github.com/0png",
+	"isDesktopOnly": true
+}

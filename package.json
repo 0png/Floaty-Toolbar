@@ -1,0 +1,23 @@
+{
+  "name": "floaty-toolbar",
+  "version": "0.1.0",
+  "description": "A sleek, modern floating selection toolbar for Obsidian.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "bun build ./src/main.ts --outfile=main.js --external obsidian --format cjs --watch",
+    "build": "bun build ./src/main.ts --outfile=main.js --external obsidian --format cjs --minify"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "toolbar"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tslib": "^2.4.0",
+    "obsidian": "latest"
+  }
+}
