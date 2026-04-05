@@ -129,7 +129,6 @@ function ensureStyles(): void {
         }
     `;
     document.head.appendChild(style);
-    console.log('[FloatyToolbar] injected inline styles with Obsidian CSS variables');
 }
 
 export class FloatyToolbar {
@@ -137,12 +136,9 @@ export class FloatyToolbar {
     private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
     show(editor: Editor, mouse: { x: number; y: number }): void {
-        console.log('[FloatyToolbar] show() called | mouse:', mouse, '| containerEl exists:', this.containerEl !== null);
-
         ensureStyles();
 
         if (this.hideTimer !== null) {
-            console.log('[FloatyToolbar] show() cancelling in-flight hideTimer');
             clearTimeout(this.hideTimer);
             this.hideTimer = null;
         }
@@ -150,7 +146,6 @@ export class FloatyToolbar {
         const alreadyVisible = this.containerEl !== null;
 
         if (!alreadyVisible) {
-            console.log('[FloatyToolbar] show() creating DOM element');
             this.containerEl = document.body.createEl('div', { cls: 'floaty-toolbar' });
 
             const groups = [
@@ -165,10 +160,7 @@ export class FloatyToolbar {
                     this.containerEl!.createEl('div', { cls: 'floaty-divider' });
                 }
             });
-
-            console.log('[FloatyToolbar] show() DOM created, children:', this.containerEl.children.length);
         } else {
-            console.log('[FloatyToolbar] show() toolbar already visible, refreshing');
             this.containerEl!.removeClass('is-hiding');
             this.containerEl!.addClass('is-active');
         }
@@ -178,7 +170,6 @@ export class FloatyToolbar {
         if (!alreadyVisible) {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    console.log('[FloatyToolbar] show() adding is-active class');
                     this.containerEl?.addClass('is-active');
                 });
             });
@@ -187,11 +178,9 @@ export class FloatyToolbar {
 
     hide(): void {
         if (!this.containerEl) {
-            console.log('[FloatyToolbar] hide() nothing to hide');
             return;
         }
 
-        console.log('[FloatyToolbar] hide() hiding toolbar');
         const el = this.containerEl;
         this.containerEl = null;
 
@@ -220,7 +209,6 @@ export class FloatyToolbar {
         if (!this.containerEl) return;
 
         const selRect = getSelectionRect();
-        console.log('[FloatyToolbar] positionToolbar() selRect:', selRect);
 
         let anchorX: number;
         let anchorTop: number;
@@ -246,7 +234,6 @@ export class FloatyToolbar {
         left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
         if (top < 8) top = anchorBottom + GAP;
 
-        console.log('[FloatyToolbar] positionToolbar() left:', left, 'top:', top);
         this.containerEl.style.left = `${left}px`;
         this.containerEl.style.top  = `${top}px`;
     }
@@ -269,7 +256,6 @@ export class FloatyToolbar {
         item.addEventListener('mousedown', (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[FloatyToolbar] action clicked:', cfg.tooltip);
             cfg.action(editor);
             this.hide();
         });
