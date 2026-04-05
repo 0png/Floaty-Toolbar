@@ -1,26 +1,85 @@
-import { Plugin, MarkdownView } from 'obsidian';
+import { Plugin, MarkdownView, Editor } from 'obsidian';
 import { FloatyToolbar } from './toolbar';
 
 export default class FloatyToolbarPlugin extends Plugin {
     private toolbar: FloatyToolbar = new FloatyToolbar();
+    private lastMousePos: { x: number; y: number } = { x: 0, y: 0 };
+    /** True while the user is holding the mouse button down (possible drag-select) */
+    private isDragging = false;
 
     async onload() {
-        console.log('Floaty Toolbar: loaded ✅');
+        console.log('[FloatyToolbar] Plugin loaded');
 
-        // Show / hide toolbar when the selection changes inside the editor
-        this.registerDomEvent(document, 'mouseup', this.onMouseUp.bind(this));
-        this.registerDomEvent(document, 'keyup',   this.onKeyUp.bind(this));
+        // ── editor-selection-change (keyboard selections & caret moves) ──────
+        this.registerEvent(
+            (this.app.workspace as any).on(
+                'editor-selection-change',
+                (editor: Editor, _view: MarkdownView) => {
+                    const sel = editor.getSelection();
+                    console.log('[FloatyToolbar] editor-selection-change | isDragging:', this.isDragging, '| sel:', JSON.stringify(sel));
 
-        // Hide when the user clicks outside the toolbar
+                    if (this.isDragging) {
+                        console.log('[FloatyToolbar] -> skipping (drag in progress)');
+                        return;
+                    }
+
+                    if (sel && sel.length > 0) {
+                        console.log('[FloatyToolbar] -> show() from selection-change');
+                        this.toolbar.show(editor, this.lastMousePos);
+                    } else {
+                        console.log('[FloatyToolbar] -> hide() from selection-change');
+                        this.toolbar.hide();
+                    }
+                }
+            )
+        );
+
+        // ── mousedown ─────────────────────────────────────────────────────────
         this.registerDomEvent(document, 'mousedown', (evt: MouseEvent) => {
-            if (!this.toolbar.contains(evt.target as Node)) {
-                this.toolbar.hide();
+            if (this.toolbar.contains(evt.target as Node)) {
+                console.log('[FloatyToolbar] mousedown inside toolbar — ignoring');
+                return;
             }
+            console.log('[FloatyToolbar] mousedown — isDragging = true');
+            this.isDragging = true;
         });
 
-        // Hide on Escape
+        // ── mouseup ───────────────────────────────────────────────────────────
+        this.registerDomEvent(document, 'mouseup', (evt: MouseEvent) => {
+            this.isDragging = false;
+            this.lastMousePos = { x: evt.clientX, y: evt.clientY };
+            console.log('[FloatyToolbar] mouseup at', evt.clientX, evt.clientY);
+
+            if (this.toolbar.contains(evt.target as Node)) {
+                console.log('[FloatyToolbar] mouseup inside toolbar — ignoring');
+                return;
+            }
+
+            setTimeout(() => {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (!view) {
+                    console.log('[FloatyToolbar] mouseup timeout — no active MarkdownView');
+                    this.toolbar.hide();
+                    return;
+                }
+
+                const sel = view.editor.getSelection();
+                console.log('[FloatyToolbar] mouseup timeout — sel:', JSON.stringify(sel));
+
+                if (sel && sel.length > 0) {
+                    console.log('[FloatyToolbar] -> show() from mouseup');
+                    this.toolbar.show(view.editor, { x: evt.clientX, y: evt.clientY });
+                } else {
+                    console.log('[FloatyToolbar] -> hide() from mouseup');
+                    this.toolbar.hide();
+                }
+            }, 10);
+        });
+
+        // ── Escape ────────────────────────────────────────────────────────────
         this.registerDomEvent(document, 'keydown', (evt: KeyboardEvent) => {
             if (evt.key === 'Escape') {
+                console.log('[FloatyToolbar] Escape — hiding');
                 this.toolbar.hide();
             }
         });
@@ -28,41 +87,5 @@ export default class FloatyToolbarPlugin extends Plugin {
 
     onunload() {
         this.toolbar.hide();
-        console.log('Floaty Toolbar: unloaded');
-    }
-
-    // ─── Private handlers ────────────────────────────────────────────────────────
-
-    private onMouseUp(_evt: MouseEvent): void {
-        // Small delay so the DOM selection is finalised before we query it
-        setTimeout(() => this.updateToolbar(), 10);
-    }
-
-    private onKeyUp(evt: KeyboardEvent): void {
-        // Only care about arrow / shift keys that extend a selection
-        const selectionKeys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
-        if (evt.shiftKey || selectionKeys.includes(evt.key)) {
-            this.updateToolbar();
-        }
-    }
-
-    private updateToolbar(): void {
-        const editor = this.getActiveEditor();
-        if (!editor) {
-            this.toolbar.hide();
-            return;
-        }
-
-        const selection = editor.getSelection();
-        if (selection && selection.length > 0) {
-            this.toolbar.show(editor);
-        } else {
-            this.toolbar.hide();
-        }
-    }
-
-    private getActiveEditor() {
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        return view?.editor ?? null;
     }
 }

@@ -1,84 +1,108 @@
 /* ─── Floaty Toolbar ─────────────────────────────────────────────────────────
-   Floating selection toolbar for Obsidian – styles.css
+   Floating selection toolbar for Obsidian
+   Uses official Obsidian CSS variables for full theme compatibility.
    ──────────────────────────────────────────────────────────────────────────── */
 
+@keyframes floaty-in {
+    0%   { opacity: 0; transform: translateY(6px) scale(0.97); }
+    60%  { opacity: 1; transform: translateY(-1px) scale(1.005); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes floaty-out {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(4px) scale(0.97); }
+}
+
+/* ─── Container ──────────────────────────────────────────────────────────── */
+
 .floaty-toolbar {
-    position: absolute;
-    z-index: 1000;
+    position: fixed;
+    z-index: 9999;
 
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 1px;
     padding: 4px 6px;
 
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 10px;
+    /* --background-floating is Obsidian's variable for popups/menus.
+       Falls back to --background-primary for themes that don't define it. */
+    background: var(--background-floating, var(--background-primary));
+    color: var(--text-normal);
+
+    border: 1px solid var(--divider-color);
+    border-radius: var(--radius-m);
     box-shadow:
-        0 4px 16px rgba(0, 0, 0, 0.18),
-        0 1px 4px  rgba(0, 0, 0, 0.10);
+        0 4px 16px rgba(0, 0, 0, 0.25),
+        0 1px 4px rgba(0, 0, 0, 0.15),
+        0 0 0 1px var(--background-modifier-border);
 
-    /* Hidden state (before animation) */
     opacity: 0;
-    transform: translateY(6px) scale(0.97);
     pointer-events: none;
-
-    transition:
-        opacity 120ms ease,
-        transform 120ms ease;
+    transition: left 80ms ease, top 80ms ease;
 }
 
-/* Visible state – toggled via JS */
-.floaty-toolbar.floaty-toolbar--visible {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+.floaty-toolbar.is-active {
     pointer-events: auto;
+    animation: floaty-in 200ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
-/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.floaty-toolbar.is-hiding {
+    pointer-events: none;
+    animation: floaty-out 160ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
 
-.floaty-btn {
+/* ─── Divider between button groups ─────────────────────────────────────── */
+
+.floaty-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--divider-color);
+    margin: 0 3px;
+    flex-shrink: 0;
+    border-radius: 1px;
+}
+
+/* ─── Action buttons ─────────────────────────────────────────────────────── */
+
+.floaty-action-item {
     display: flex;
     align-items: center;
     justify-content: center;
 
-    width: 30px;
-    height: 30px;
-    padding: 0;
-
-    background: transparent;
-    border: none;
-    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-s);
     cursor: pointer;
-    color: var(--text-muted);
 
-    transition:
-        background 100ms ease,
-        color 100ms ease,
-        transform 80ms ease;
+    /* --text-muted: dimmed icon color at rest */
+    color: var(--text-muted);
+    transition: background 100ms ease, color 100ms ease, transform 100ms ease;
 }
 
-.floaty-btn:hover {
+.floaty-action-item:hover {
+    /* --background-modifier-hover: Obsidian's standard hover surface */
     background: var(--background-modifier-hover);
     color: var(--text-normal);
-    transform: scale(1.1);
 }
 
-.floaty-btn:active {
+.floaty-action-item:active {
+    transform: scale(0.88);
     background: var(--background-modifier-active-hover);
-    transform: scale(0.95);
+    color: var(--text-normal);
 }
 
-/* Ensure Lucide SVG icons scale correctly */
-.floaty-btn svg {
+.floaty-action-item:focus-visible {
+    /* --interactive-accent: the user's chosen accent color */
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+}
+
+/* ─── Icons ──────────────────────────────────────────────────────────────── */
+
+.floaty-action-item svg {
     width: 16px;
     height: 16px;
     pointer-events: none;
-}
-
-/* ─── Dark theme adjustment ──────────────────────────────────────────────── */
-.theme-dark .floaty-toolbar {
-    box-shadow:
-        0 4px 20px rgba(0, 0, 0, 0.40),
-        0 1px 6px  rgba(0, 0, 0, 0.25);
+    stroke-width: 2px;
 }
