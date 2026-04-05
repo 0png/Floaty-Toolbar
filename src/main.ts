@@ -1,16 +1,60 @@
 import { Plugin, MarkdownView, Editor } from 'obsidian';
 import { FloatyToolbar } from './toolbar';
+import {
+    applyBold,
+    applyItalic,
+    applyStrikethrough,
+    applyCode,
+    applyHighlight,
+    applyLink,
+} from './utils';
 
 export default class FloatyToolbarPlugin extends Plugin {
     private toolbar: FloatyToolbar = new FloatyToolbar();
     private lastMousePos: { x: number; y: number } = { x: 0, y: 0 };
-    /** True while the user is holding the mouse button down (possible drag-select) */
     private isDragging = false;
 
     async onload() {
         console.log('[FloatyToolbar] Plugin loaded');
 
-        // ── editor-selection-change (keyboard selections & caret moves) ──────
+        // ── Commands (appear in Settings → Hotkeys, fully user-assignable) ───
+        this.addCommand({
+            id: 'floaty-bold',
+            name: 'Bold',
+            editorCallback: (editor: Editor) => applyBold(editor),
+        });
+
+        this.addCommand({
+            id: 'floaty-italic',
+            name: 'Italic',
+            editorCallback: (editor: Editor) => applyItalic(editor),
+        });
+
+        this.addCommand({
+            id: 'floaty-strikethrough',
+            name: 'Strikethrough',
+            editorCallback: (editor: Editor) => applyStrikethrough(editor),
+        });
+
+        this.addCommand({
+            id: 'floaty-inline-code',
+            name: 'Inline Code',
+            editorCallback: (editor: Editor) => applyCode(editor),
+        });
+
+        this.addCommand({
+            id: 'floaty-highlight',
+            name: 'Highlight',
+            editorCallback: (editor: Editor) => applyHighlight(editor),
+        });
+
+        this.addCommand({
+            id: 'floaty-insert-link',
+            name: 'Insert Link',
+            editorCallback: (editor: Editor) => applyLink(editor),
+        });
+
+        // ── editor-selection-change (keyboard selections) ─────────────────────
         this.registerEvent(
             (this.app.workspace as any).on(
                 'editor-selection-change',
