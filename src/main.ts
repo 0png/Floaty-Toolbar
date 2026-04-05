@@ -1,4 +1,8 @@
-import { Plugin, MarkdownView, Editor } from 'obsidian';
+import { Plugin, MarkdownView, Editor, EventRef } from 'obsidian';
+
+interface WorkspaceWithEvents {
+    on(name: 'editor-selection-change', callback: (editor: Editor, view: MarkdownView) => void): EventRef;
+}
 import { FloatyToolbar } from './toolbar';
 import {
     applyBold,
@@ -54,7 +58,7 @@ export default class FloatyToolbarPlugin extends Plugin {
 
         // ── editor-selection-change (keyboard selections) ─────────────────────
         this.registerEvent(
-            (this.app.workspace as any).on(
+            (this.app.workspace as unknown as WorkspaceWithEvents).on(
                 'editor-selection-change',
                 (editor: Editor, _view: MarkdownView) => {
                     const sel = editor.getSelection();

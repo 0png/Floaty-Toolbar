@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "bun build ./src/main.ts --outfile=main.js --external obsidian --format cjs --watch",
-    "build": "bun build ./src/main.ts --outfile=main.js --external obsidian --format cjs --minify"
+    "build": "bun build ./src/main.ts --outfile=main.js --external obsidian --format cjs --minify",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [
     "obsidian",
@@ -15,9 +17,15 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "obsidian": "latest",
     "tslib": "^2.4.0",
-    "obsidian": "latest"
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.58.0"
   }
 }

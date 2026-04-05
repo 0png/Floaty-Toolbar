@@ -2,18 +2,14 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "CommonJS",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["DOM", "ESNext"],
     "types": ["node"],
-    "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "*": ["node_modules/*", "src/*"]
-    }
+    "rootDir": "./src"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "main.js"]
