@@ -27,6 +27,11 @@
     100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
+@keyframes dock-fall {
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.93); }
+}
+
 /* ── Custom tooltip ───────────────────────────────────────────────────────── */
 
 .floaty-custom-tooltip {
@@ -115,6 +120,11 @@
 
 .floaty-dock.dock-rising {
     animation: dock-rise 350ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.floaty-dock.dock-falling {
+    animation: dock-fall 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    pointer-events: none;
 }
 
 /* Apple magnification */

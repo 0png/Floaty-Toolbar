@@ -76,4 +76,10 @@ Bug reports, feature requests, and pull requests are welcome. Please open an [is
 
 ---
 
+## License
+
+MIT
+
+---
+
 Created by [0png](https://github.com/0png)

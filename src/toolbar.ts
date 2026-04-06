@@ -239,6 +239,26 @@ export class FloatyToolbar {
         this.dockIsVisible = false;
     }
 
+    destroyDockAnimated(onDone: () => void): void {
+        if (!this.dockEl) { onDone(); return; }
+        if (this._onKeyDown)   document.removeEventListener('keydown',   this._onKeyDown, true);
+        if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
+        this._onKeyDown   = null;
+        this._onMouseMove = null;
+        if (this.dockAutoHideTimer !== null) { clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
+        const el = this.dockEl;
+        let done = false;
+        const finish = () => { if (done) return; done = true; el.remove(); onDone(); };
+        el.removeClass('dock-visible', 'dock-hidden', 'dock-rising');
+        el.addClass('dock-falling');
+        el.addEventListener('animationend', finish, { once: true });
+        setTimeout(finish, 400); // safety fallback
+        this.dockEl       = null;
+        this.dockEditor   = null;
+        this.dockSettings = null;
+        this.dockIsVisible = false;
+    }
+
     // ── Floating toolbar ──────────────────────────────────────────────────────
 
     private showFloating(editor: Editor, mouse: { x: number; y: number }, settings: PluginSettings): void {

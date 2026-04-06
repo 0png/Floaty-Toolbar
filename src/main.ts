@@ -71,13 +71,25 @@ export default class FloatyToolbarPlugin extends Plugin {
         this.toolbar.onPinToggle = async (docked: boolean) => {
             this.settings.dockedMode = docked;
             await this.saveSettings();
-            // Tear everything down and remount in the new mode
-            this.toolbar.destroy();
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (docked && view) {
-                this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
+            if (!docked) {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                const sel = view?.editor.getSelection();
+                if (sel && sel.length > 0) {
+                    // Text is selected — switch straight to floating toolbar
+                    this.toolbar.destroy();
+                    this.toolbar.show(view!.editor, this.lastMousePos, this.settings);
+                } else {
+                    // Nothing selected — animate dock out, then vanish
+                    this.toolbar.destroyDockAnimated(() => {
+                        this.toolbar.destroy();
+                    });
+                }
+            } else {
+                // Tear everything down and remount in dock mode
+                this.toolbar.destroy();
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
             }
-            // In floating mode the toolbar will show on the next selection
         };
 
         // ── Commands ────────────────────────────────────────────────────────
