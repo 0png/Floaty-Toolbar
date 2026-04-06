@@ -82,6 +82,7 @@ export default class FloatyToolbarPlugin extends Plugin {
                 return;
             }
             this.isDragging = true;
+            this.toolbar.hide();
         });
 
         // ── mouseup ───────────────────────────────────────────────────────────
@@ -96,6 +97,14 @@ export default class FloatyToolbarPlugin extends Plugin {
             setTimeout(() => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (!view) {
+                    this.toolbar.hide();
+                    return;
+                }
+
+                const editorEl = view.contentEl;
+                const clickedInsideEditor = editorEl?.contains(evt.target as Node) ?? false;
+
+                if (!clickedInsideEditor) {
                     this.toolbar.hide();
                     return;
                 }
