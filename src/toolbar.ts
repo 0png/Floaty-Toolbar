@@ -168,7 +168,7 @@ export class FloatyToolbar {
         const dock = document.body.createEl('div', { cls: 'floaty-dock' });
         this.dockEl = dock;
 
-        this.buildToolbarContent(dock, editor, settings, true);
+        this.buildToolbarContent(dock, () => this.dockEditor!, settings, true);
         this.setupKeyboardNav(dock);
 
         // Rise animation
@@ -248,7 +248,7 @@ export class FloatyToolbar {
 
         if (!alreadyVisible) {
             this.containerEl = document.body.createEl('div', { cls: 'floaty-toolbar' });
-            this.buildToolbarContent(this.containerEl, editor, settings, false);
+            this.buildToolbarContent(this.containerEl, () => editor, settings, false);
             this.setupKeyboardNav(this.containerEl);
         } else {
             this.containerEl!.removeClass('is-hiding');
@@ -281,24 +281,24 @@ export class FloatyToolbar {
 
     private buildToolbarContent(
         container: HTMLElement,
-        editor: Editor,
+        getEditor: () => Editor,
         settings: PluginSettings,
         isDock: boolean
     ): void {
         const above = isDock; // dropdowns open upward in dock, downward in floating
 
-        this.createActionItem(container, ACTIONS[0], editor, settings, isDock);
-        this.createActionItem(container, ACTIONS[1], editor, settings, isDock);
+        this.createActionItem(container, ACTIONS[0], getEditor, settings, isDock);
+        this.createActionItem(container, ACTIONS[1], getEditor, settings, isDock);
         container.createEl('div', { cls: 'floaty-divider' });
-        this.createActionItem(container, ACTIONS[2], editor, settings, isDock);
-        this.createActionItem(container, ACTIONS[3], editor, settings, isDock);
+        this.createActionItem(container, ACTIONS[2], getEditor, settings, isDock);
+        this.createActionItem(container, ACTIONS[3], getEditor, settings, isDock);
         container.createEl('div', { cls: 'floaty-divider' });
-        this.createActionItem(container, ACTIONS[4], editor, settings, isDock);
-        this.createActionItem(container, ACTIONS[5], editor, settings, isDock);
+        this.createActionItem(container, ACTIONS[4], getEditor, settings, isDock);
+        this.createActionItem(container, ACTIONS[5], getEditor, settings, isDock);
         container.createEl('div', { cls: 'floaty-divider' });
-        this.createHeadingDropdown(container, editor, above, isDock);
+        this.createHeadingDropdown(container, getEditor, above, isDock);
         container.createEl('div', { cls: 'floaty-divider' });
-        this.createCalloutDropdown(container, editor, above, isDock);
+        this.createCalloutDropdown(container, getEditor, above, isDock);
         container.createEl('div', { cls: 'floaty-divider' });
 
         // Pin button — always last
@@ -411,7 +411,7 @@ export class FloatyToolbar {
 
     // ── Heading dropdown ──────────────────────────────────────────────────────
 
-    private createHeadingDropdown(container: HTMLElement, editor: Editor, openUpward: boolean, isDock: boolean): void {
+    private createHeadingDropdown(container: HTMLElement, getEditor: () => Editor, openUpward: boolean, isDock: boolean): void {
         const trigger = container.createEl('div', {
             cls: 'floaty-dropdown-trigger',
             attr: { role: 'button', tabindex: '0' },
@@ -433,7 +433,7 @@ export class FloatyToolbar {
                 }
                 item.addEventListener('mousedown', (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    applyHeading(editor, opt.level);
+                    applyHeading(getEditor(), opt.level);
                     this.closeDropdown();
                     if (!isDock) this.hideFloating();
                 });
@@ -445,7 +445,7 @@ export class FloatyToolbar {
 
     // ── Callout dropdown ──────────────────────────────────────────────────────
 
-    private createCalloutDropdown(container: HTMLElement, editor: Editor, openUpward: boolean, isDock: boolean): void {
+    private createCalloutDropdown(container: HTMLElement, getEditor: () => Editor, openUpward: boolean, isDock: boolean): void {
         const trigger = container.createEl('div', {
             cls: 'floaty-dropdown-trigger',
             attr: { role: 'button', tabindex: '0' },
@@ -464,7 +464,7 @@ export class FloatyToolbar {
                 item.createSpan({ text: opt.label });
                 item.addEventListener('mousedown', (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    applyCallout(editor, opt.type);
+                    applyCallout(getEditor(), opt.type);
                     this.closeDropdown();
                     if (!isDock) this.hideFloating();
                 });
@@ -506,7 +506,7 @@ export class FloatyToolbar {
     private createActionItem(
         container: HTMLElement,
         cfg: IconAction,
-        editor: Editor,
+        getEditor: () => Editor,
         settings: PluginSettings,
         isDock: boolean
     ): void {
@@ -519,7 +519,7 @@ export class FloatyToolbar {
         attachTooltip(item, cfg.tooltip, isDock);
 
         const execute = () => {
-            const result = cfg.action(editor, settings);
+            const result = cfg.action(getEditor(), settings);
             if (!isDock) {
                 if (result instanceof Promise) result.then(() => this.hideFloating());
                 else this.hideFloating();

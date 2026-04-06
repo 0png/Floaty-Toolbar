@@ -1,18 +1,21 @@
 import { Editor, Notice } from 'obsidian';
 
+let smartUrlNoticeSeen = false;
+
 export function wrapSelection(editor: Editor, prefix: string, suffix?: string): void {
     const selected = editor.getSelection();
     const _suffix = suffix ?? prefix;
     if (!selected) return;
 
+    const inner = selected.slice(prefix.length, selected.length - _suffix.length);
     const isWrapped =
         selected.length > prefix.length + _suffix.length &&
         selected.startsWith(prefix) &&
         selected.endsWith(_suffix) &&
-        selected.slice(prefix.length, prefix.length + prefix.length) !== prefix;
+        !inner.startsWith(prefix);
 
     if (isWrapped) {
-        editor.replaceSelection(selected.slice(prefix.length, selected.length - _suffix.length));
+        editor.replaceSelection(inner);
     } else {
         editor.replaceSelection(`${prefix}${selected}${_suffix}`);
     }
@@ -63,11 +66,13 @@ export async function applyLink(editor: Editor, smartUrl: boolean): Promise<void
             // Clipboard read failed (permissions) — fall back to placeholder
         }
     } else {
-        // Remind user once per session that Smart URL exists
-        new Notice(
-            '💡 Tip: Enable "Smart URL" in Floaty Toolbar settings to auto-paste URLs from clipboard.',
-            6000
-        );
+        if (!smartUrlNoticeSeen) {
+            smartUrlNoticeSeen = true;
+            new Notice(
+                '💡 Tip: Enable "Smart URL" in Floaty Toolbar settings to auto-paste URLs from clipboard.',
+                6000
+            );
+        }
     }
 
     editor.replaceSelection(`[${selected}](${url})`);

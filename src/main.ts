@@ -48,7 +48,9 @@ class FloatySettingTab extends PluginSettingTab {
 }
 
 // ─── Workspace event interface ────────────────────────────────────────────────
-
+// `editor-selection-change` is a real Obsidian workspace event but is not
+// included in the public TypeScript typings. The cast lets us register it
+// without disabling type-checking for the whole file.
 interface WorkspaceWithEvents {
     on(name: 'editor-selection-change', callback: (editor: Editor, view: MarkdownView) => void): EventRef;
 }
