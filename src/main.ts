@@ -1,5 +1,6 @@
 import { Plugin, MarkdownView, Editor, EventRef, PluginSettingTab, App, Setting } from 'obsidian';
 import { FloatyToolbar } from './toolbar';
+import { FloatyHud } from './hud';
 import {
     applyBold, applyItalic, applyStrikethrough, applyCode,
     applyHighlight, applyLink, applyHeading, applyCallout,
@@ -58,12 +59,15 @@ interface WorkspaceWithEvents {
 
 export default class FloatyToolbarPlugin extends Plugin {
     toolbar: FloatyToolbar = new FloatyToolbar();
+    hud!: FloatyHud;
     settings: PluginSettings = { ...DEFAULT_SETTINGS };
     private lastMousePos: { x: number; y: number } = { x: 0, y: 0 };
     private isDragging = false;
 
     async onload() {
         await this.loadSettings();
+        this.hud = new FloatyHud(this);
+        this.hud.mount();
         this.addSettingTab(new FloatySettingTab(this.app, this));
 
         // Wire up pin toggle — instant switch, no reload needed
@@ -174,7 +178,7 @@ export default class FloatyToolbarPlugin extends Plugin {
         }
     }
 
-    onunload() { this.toolbar.destroy(); }
+    onunload() { this.toolbar.destroy(); this.hud.destroy(); }
 
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<PluginSettings>);

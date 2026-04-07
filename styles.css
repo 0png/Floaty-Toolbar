@@ -293,3 +293,137 @@
 .floaty-callout-icon-warning   { color: var(--color-yellow); }
 .floaty-callout-icon-important { color: var(--color-purple); }
 .floaty-callout-icon-caution   { color: var(--color-red); }
+
+/* ── HUD status bar items ─────────────────────────────────────────────────── */
+
+.floaty-hud-item {
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 4px;
+    transition: background 120ms ease, color 120ms ease;
+    font-size: var(--font-ui-small);
+    font-family: var(--font-monospace);
+    color: var(--text-muted);
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.floaty-hud-item:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+.floaty-hud-item.pomodoro-work  { color: var(--color-red); }
+.floaty-hud-item.pomodoro-break { color: var(--color-green); }
+
+/* ── HUD popover panel ────────────────────────────────────────────────────── */
+
+.floaty-hud-popover {
+    position: fixed;
+    z-index: 10010;
+    min-width: 220px;
+    padding: 12px 14px 14px;
+    background: var(--background-floating, var(--background-primary));
+    border: 1px solid var(--divider-color);
+    border-radius: var(--radius-m);
+    box-shadow:
+        0 -4px 24px rgba(0,0,0,0.20),
+        0 2px 8px rgba(0,0,0,0.12),
+        0 0 0 1px var(--background-modifier-border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.floaty-hud-popover h3 {
+    margin: 0 0 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+    font-family: var(--font-interface);
+}
+
+.floaty-hud-countdown {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: var(--font-monospace);
+    text-align: center;
+    color: var(--text-normal);
+    letter-spacing: 2px;
+    line-height: 1;
+    padding: 4px 0;
+}
+.floaty-hud-countdown.phase-work  { color: var(--color-red); }
+.floaty-hud-countdown.phase-break { color: var(--color-green); }
+
+.floaty-hud-phase-label {
+    text-align: center;
+    font-size: 11px;
+    font-family: var(--font-interface);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.floaty-hud-controls {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+.floaty-hud-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 14px;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-interface);
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--background-modifier-hover);
+    border: 1px solid var(--divider-color);
+    transition: background 100ms ease, color 100ms ease;
+    user-select: none;
+}
+.floaty-hud-btn:hover { background: var(--background-modifier-active-hover); color: var(--text-normal); }
+.floaty-hud-btn.primary {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: transparent;
+}
+.floaty-hud-btn.primary:hover { filter: brightness(1.1); }
+
+.floaty-hud-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.floaty-hud-setting-label {
+    font-size: 12px;
+    font-family: var(--font-interface);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.floaty-hud-setting-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--interactive-accent);
+    cursor: pointer;
+}
+.floaty-hud-setting-value {
+    font-size: 12px;
+    font-family: var(--font-monospace);
+    color: var(--text-normal);
+    min-width: 32px;
+    text-align: right;
+}
+
+.floaty-hud-sep {
+    height: 1px;
+    background: var(--divider-color);
+    margin: 0 -14px;
+}
+
+/* Positioning helper — panel starts invisible while measuring */
+.floaty-hud-popover.is-measuring { visibility: hidden; }
