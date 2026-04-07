@@ -54,9 +54,7 @@ function showTooltip(text: string, anchor: HTMLElement, above: boolean): void {
         tooltipEl = tip;
 
         const r = anchor.getBoundingClientRect();
-        tip.style.visibility = 'hidden';
-        tip.style.position   = 'fixed';
-        tip.style.zIndex     = '10002';
+        tip.addClass('floaty-measuring');
 
         requestAnimationFrame(() => {
             const tw = tip.offsetWidth;
@@ -68,7 +66,7 @@ function showTooltip(text: string, anchor: HTMLElement, above: boolean): void {
 
             tip.style.left       = `${left}px`;
             tip.style.top        = `${top}px`;
-            tip.style.visibility = '';
+            tip.removeClass('floaty-measuring');
         });
     }, 400);
 }
@@ -89,12 +87,12 @@ function attachTooltip(el: HTMLElement, text: string, above: boolean): void {
 
 function createChevronSvg(): SVGSVGElement {
     const NS  = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg') as SVGSVGElement;
+    const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('fill', 'none');
     svg.setAttribute('stroke', 'currentColor');
     svg.classList.add('floaty-chevron');
-    const path = document.createElementNS(NS, 'path') as SVGPathElement;
+    const path = document.createElementNS(NS, 'path');
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('stroke-linejoin', 'round');
     path.setAttribute('d', 'M6 9l6 6 6-6');
@@ -391,13 +389,11 @@ export class FloatyToolbar {
         const panel = document.body.createEl('div', { cls: 'floaty-dropdown' });
         this.openDropdown = panel;
 
-        panel.style.visibility = 'hidden';
-        panel.style.position   = 'fixed';
+        panel.addClass('floaty-measuring');
 
         const tr = triggerEl.getBoundingClientRect();
         let left = tr.left;
         panel.style.left = `${left}px`;
-        panel.style.top  = '0px';
 
         requestAnimationFrame(() => {
             const pr = panel.getBoundingClientRect();
@@ -410,7 +406,7 @@ export class FloatyToolbar {
 
             panel.style.left       = `${left}px`;
             panel.style.top        = `${Math.max(8, top)}px`;
-            panel.style.visibility = '';
+            panel.removeClass('floaty-measuring');
         });
 
         const onOutside = (e: MouseEvent) => {
@@ -541,7 +537,7 @@ export class FloatyToolbar {
         const execute = () => {
             const result = cfg.action(getEditor(), settings);
             if (!isDock) {
-                if (result instanceof Promise) result.then(() => this.hideFloating());
+                if (result instanceof Promise) void result.then(() => this.hideFloating());
                 else this.hideFloating();
             }
         };

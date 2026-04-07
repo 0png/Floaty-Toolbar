@@ -26,7 +26,6 @@ class FloatySettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl('h2', { text: 'Floaty Toolbar' });
 
         new Setting(containerEl)
             .setName('Smart URL detection')
@@ -68,47 +67,49 @@ export default class FloatyToolbarPlugin extends Plugin {
         this.addSettingTab(new FloatySettingTab(this.app, this));
 
         // Wire up pin toggle — instant switch, no reload needed
-        this.toolbar.onPinToggle = async (docked: boolean) => {
-            this.settings.dockedMode = docked;
-            await this.saveSettings();
-            if (!docked) {
-                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                const sel = view?.editor.getSelection();
-                if (sel && sel.length > 0) {
-                    // Text is selected — switch straight to floating toolbar
-                    this.toolbar.destroy();
-                    this.toolbar.show(view!.editor, this.lastMousePos, this.settings);
-                } else {
-                    // Nothing selected — animate dock out, then vanish
-                    this.toolbar.destroyDockAnimated(() => {
+        this.toolbar.onPinToggle = (docked: boolean) => {
+            void (async () => {
+                this.settings.dockedMode = docked;
+                await this.saveSettings();
+                if (!docked) {
+                    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                    const sel = view?.editor.getSelection();
+                    if (sel && sel.length > 0) {
+                        // Text is selected — switch straight to floating toolbar
                         this.toolbar.destroy();
-                    });
+                        this.toolbar.show(view!.editor, this.lastMousePos, this.settings);
+                    } else {
+                        // Nothing selected — animate dock out, then vanish
+                        this.toolbar.destroyDockAnimated(() => {
+                            this.toolbar.destroy();
+                        });
+                    }
+                } else {
+                    // Tear everything down and remount in dock mode
+                    this.toolbar.destroy();
+                    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                    if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
                 }
-            } else {
-                // Tear everything down and remount in dock mode
-                this.toolbar.destroy();
-                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
-            }
+            })();
         };
 
         // ── Commands ────────────────────────────────────────────────────────
         this.addCommand({ id: 'floaty-bold',              name: 'Bold',             editorCallback: (e) => applyBold(e) });
         this.addCommand({ id: 'floaty-italic',            name: 'Italic',           editorCallback: (e) => applyItalic(e) });
         this.addCommand({ id: 'floaty-strikethrough',     name: 'Strikethrough',    editorCallback: (e) => applyStrikethrough(e) });
-        this.addCommand({ id: 'floaty-inline-code',       name: 'Inline Code',      editorCallback: (e) => applyCode(e) });
+        this.addCommand({ id: 'floaty-inline-code',       name: 'Inline code',      editorCallback: (e) => applyCode(e) });
         this.addCommand({ id: 'floaty-highlight',         name: 'Highlight',        editorCallback: (e) => applyHighlight(e) });
-        this.addCommand({ id: 'floaty-insert-link',       name: 'Insert Link',      editorCallback: (e) => applyLink(e, this.settings.smartUrl) });
+        this.addCommand({ id: 'floaty-insert-link',       name: 'Insert link',      editorCallback: (e) => applyLink(e, this.settings.smartUrl) });
         this.addCommand({ id: 'floaty-heading-1',         name: 'Heading 1',        editorCallback: (e) => applyHeading(e, 1) });
         this.addCommand({ id: 'floaty-heading-2',         name: 'Heading 2',        editorCallback: (e) => applyHeading(e, 2) });
         this.addCommand({ id: 'floaty-heading-3',         name: 'Heading 3',        editorCallback: (e) => applyHeading(e, 3) });
         this.addCommand({ id: 'floaty-heading-4',         name: 'Heading 4',        editorCallback: (e) => applyHeading(e, 4) });
-        this.addCommand({ id: 'floaty-heading-plain',     name: 'Remove Heading',   editorCallback: (e) => applyHeading(e, 0) });
-        this.addCommand({ id: 'floaty-callout-note',      name: 'Callout: Note',      editorCallback: (e) => applyCallout(e, 'note') });
-        this.addCommand({ id: 'floaty-callout-tip',       name: 'Callout: Tip',       editorCallback: (e) => applyCallout(e, 'tip') });
-        this.addCommand({ id: 'floaty-callout-warning',   name: 'Callout: Warning',   editorCallback: (e) => applyCallout(e, 'warning') });
-        this.addCommand({ id: 'floaty-callout-important', name: 'Callout: Important', editorCallback: (e) => applyCallout(e, 'important') });
-        this.addCommand({ id: 'floaty-callout-caution',   name: 'Callout: Caution',   editorCallback: (e) => applyCallout(e, 'caution') });
+        this.addCommand({ id: 'floaty-heading-plain',     name: 'Remove heading',   editorCallback: (e) => applyHeading(e, 0) });
+        this.addCommand({ id: 'floaty-callout-note',      name: 'Callout: note',      editorCallback: (e) => applyCallout(e, 'note') });
+        this.addCommand({ id: 'floaty-callout-tip',       name: 'Callout: tip',       editorCallback: (e) => applyCallout(e, 'tip') });
+        this.addCommand({ id: 'floaty-callout-warning',   name: 'Callout: warning',   editorCallback: (e) => applyCallout(e, 'warning') });
+        this.addCommand({ id: 'floaty-callout-important', name: 'Callout: important', editorCallback: (e) => applyCallout(e, 'important') });
+        this.addCommand({ id: 'floaty-callout-caution',   name: 'Callout: caution',   editorCallback: (e) => applyCallout(e, 'caution') });
 
         // ── editor-selection-change ──────────────────────────────────────────
         this.registerEvent(
@@ -131,7 +132,7 @@ export default class FloatyToolbarPlugin extends Plugin {
         );
 
         // ── mousedown ───────────────────────────────────────────────────────
-        this.registerDomEvent(document, 'mousedown', (evt: MouseEvent) => {
+        this.registerDomEvent(window.document, 'mousedown', (evt: MouseEvent) => {
             if (this.toolbar.contains(evt.target as Node)) return;
             if (this.settings.dockedMode) return;
             this.isDragging = true;
@@ -139,14 +140,14 @@ export default class FloatyToolbarPlugin extends Plugin {
         });
 
         // ── mouseup ─────────────────────────────────────────────────────────
-        this.registerDomEvent(document, 'mouseup', (evt: MouseEvent) => {
+        this.registerDomEvent(window.document, 'mouseup', (evt: MouseEvent) => {
             this.isDragging = false;
             this.lastMousePos = { x: evt.clientX, y: evt.clientY };
 
             if (this.toolbar.contains(evt.target as Node)) return;
             if (this.settings.dockedMode) return;
 
-            setTimeout(() => {
+            window.setTimeout(() => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (!view) { this.toolbar.hide(); return; }
                 if (!(view.contentEl?.contains(evt.target as Node) ?? false)) { this.toolbar.hide(); return; }
@@ -160,7 +161,7 @@ export default class FloatyToolbarPlugin extends Plugin {
         });
 
         // ── Escape ──────────────────────────────────────────────────────────
-        this.registerDomEvent(document, 'keydown', (evt: KeyboardEvent) => {
+        this.registerDomEvent(window.document, 'keydown', (evt: KeyboardEvent) => {
             if (evt.key === 'Escape') this.toolbar.hide();
         });
 
@@ -176,7 +177,7 @@ export default class FloatyToolbarPlugin extends Plugin {
     onunload() { this.toolbar.destroy(); }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<PluginSettings>);
     }
     async saveSettings() { await this.saveData(this.settings); }
 }

@@ -34,6 +34,8 @@
 
 /* ── Custom tooltip ───────────────────────────────────────────────────────── */
 
+.floaty-measuring { visibility: hidden; }
+
 .floaty-custom-tooltip {
     position: fixed;
     z-index: 10002;
