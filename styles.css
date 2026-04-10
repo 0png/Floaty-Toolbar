@@ -28,8 +28,35 @@
 }
 
 @keyframes dock-fall {
-    0%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
     100% { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.93); }
+}
+
+/* Premium hide: falls AND narrows slightly, as if retreating into the floor */
+@keyframes dock-hide {
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0)   scaleX(1)    scaleY(1); }
+    40%  {             transform: translateX(-50%) translateY(4px)  scaleX(0.97) scaleY(0.99); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(32px) scaleX(0.92) scaleY(0.96); }
+}
+
+/* Peek: just the top 6px of the dock peeks above the viewport floor.
+   Uses a transition (not a keyframe) so dockReveal() can interrupt it cleanly
+   by removing dock-peeking and adding dock-visible. The dock sits at bottom:20px,
+   so translateY(52px) pushes it down until ~6px of the top edge remains visible
+   (52px ≈ dock height ~44px + a little extra). */
+.floaty-dock.dock-peeking {
+    opacity: 0.55;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(52px) scaleX(0.96);
+    transition:
+        opacity 220ms cubic-bezier(0.25, 1, 0.5, 1),
+        transform 220ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Long-press: breathing scale to signal "ready to drag" */
+@keyframes floaty-long-press-pulse {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.18); }
 }
 
 /* ── Custom tooltip ───────────────────────────────────────────────────────── */
@@ -66,8 +93,8 @@
     border-radius: var(--radius-m);
     box-shadow:
         0 4px 16px rgba(0, 0, 0, 0.25),
-        0 1px 4px rgba(0, 0, 0, 0.15),
-        0 0 0 1px var(--background-modifier-border);
+        0 1px 4px  rgba(0, 0, 0, 0.15),
+        0 0 0 1px  var(--background-modifier-border);
     opacity: 0;
     pointer-events: none;
     transition: left 80ms ease, top 80ms ease;
@@ -99,25 +126,46 @@
     border-radius: 20px;
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.20),
-        0 2px 8px rgba(0, 0, 0, 0.12),
-        0 0 0 1px var(--background-modifier-border);
+        0 2px 8px  rgba(0, 0, 0, 0.12),
+        0 0 0 1px  var(--background-modifier-border);
     opacity: 0;
     pointer-events: none;
-    transition:
-        opacity 300ms cubic-bezier(0.4, 0, 0.2, 1),
-        transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    /* Base transform must include translateX(-50%) so all transitions animate correctly */
+    transform: translateX(-50%) translateY(32px) scaleX(0.92);
+    /* No transition on the base rule — transitions are only on dock-visible so that
+       keyframe-animated states (dock-hiding etc.) never have a transition fighting them. */
 }
 
 .floaty-dock.dock-visible {
     opacity: 1;
     pointer-events: auto;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(0) scaleX(1);
+    transition:
+        opacity 280ms cubic-bezier(0.4, 0, 0.2, 1),
+        transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* dock-hidden is the fully offscreen stable state */
 .floaty-dock.dock-hidden {
     opacity: 0;
     pointer-events: none;
-    transform: translateX(-50%) translateY(32px);
+    transform: translateX(-50%) translateY(32px) scaleX(0.92);
+}
+
+/* dock-hiding plays the premium retreating animation, then JS switches to dock-hidden */
+.floaty-dock.dock-hiding {
+    pointer-events: none;
+    animation: dock-hide 320ms cubic-bezier(0.4, 0, 0.8, 0.8) forwards;
+}
+
+
+/* dock-hiding, dock-rising, dock-falling use keyframe animations —
+   suppress any inherited transition while they run. dock-peeking uses a
+   plain CSS transition so it is intentionally excluded from this list. */
+.floaty-dock.dock-hiding,
+.floaty-dock.dock-rising,
+.floaty-dock.dock-falling {
+    transition: none;
 }
 
 .floaty-dock.dock-rising {
@@ -154,6 +202,72 @@
     transform: scale(0.92) translateY(0);
 }
 
+/* ── Item wrapper (drag target) ───────────────────────────────────────────── */
+
+/* The wrapper is the invisible hit-testing shell around each button */
+.floaty-item-wrapper {
+    display: contents; /* invisible in layout — only data-floaty-id matters */
+    position: relative;
+}
+
+/* When a drag is in progress, wrappers need to be block for hit testing */
+body.floaty-dragging .floaty-item-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-s);
+}
+
+/* Source item fades while being dragged */
+.floaty-drag-source {
+    opacity: 0.35;
+    filter: grayscale(0.4);
+    transition: opacity 150ms ease, filter 150ms ease;
+}
+
+/* Drop target highlight */
+.floaty-drop-target {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-s);
+    background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+
+/* Ghost that follows the cursor */
+.floaty-drag-ghost {
+    position: fixed;
+    z-index: 10010;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-s);
+    background: var(--background-floating, var(--background-primary));
+    border: 1.5px solid var(--interactive-accent);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.28),
+        0 2px 6px  rgba(0, 0, 0, 0.16);
+    opacity: 0.92;
+    pointer-events: none;
+    color: var(--text-normal);
+    transition: box-shadow 80ms ease;
+    /* Slight rotation for "picked up" feel */
+    transform: rotate(4deg) scale(1.08);
+}
+
+.floaty-drag-ghost svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2px;
+    pointer-events: none;
+}
+
+/* Long-press breathing animation — signals drag is about to start */
+.floaty-long-press-ready .floaty-action-item,
+.floaty-long-press-ready .floaty-dropdown-trigger {
+    animation: floaty-long-press-pulse 500ms cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+    color: var(--interactive-accent);
+}
+
 /* ── Divider ──────────────────────────────────────────────────────────────── */
 
 .floaty-divider {
@@ -179,10 +293,10 @@
     transition: background 100ms ease, color 100ms ease, transform 100ms ease;
 }
 
-.floaty-action-item:hover  { background: var(--background-modifier-hover); color: var(--text-normal); }
-.floaty-action-item:active { transform: scale(0.88); background: var(--background-modifier-active-hover); color: var(--text-normal); }
+.floaty-action-item:hover         { background: var(--background-modifier-hover); color: var(--text-normal); }
+.floaty-action-item:active        { transform: scale(0.88); background: var(--background-modifier-active-hover); color: var(--text-normal); }
 .floaty-action-item:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
-.floaty-action-item svg    { width: 16px; height: 16px; pointer-events: none; stroke-width: 2px; }
+.floaty-action-item svg           { width: 16px; height: 16px; pointer-events: none; stroke-width: 2px; }
 
 /* ── Pin button ───────────────────────────────────────────────────────────── */
 
@@ -199,10 +313,10 @@
     flex-shrink: 0;
 }
 
-.floaty-pin-btn:hover  { background: var(--background-modifier-hover); color: var(--text-muted); }
-.floaty-pin-btn:active { transform: scale(0.88); }
+.floaty-pin-btn:hover    { background: var(--background-modifier-hover); color: var(--text-muted); }
+.floaty-pin-btn:active   { transform: scale(0.88); }
 .floaty-pin-btn.is-pinned { color: var(--interactive-accent); }
-.floaty-pin-btn svg { width: 14px; height: 14px; pointer-events: none; stroke-width: 2px; }
+.floaty-pin-btn svg      { width: 14px; height: 14px; pointer-events: none; stroke-width: 2px; }
 
 /* ── Dropdown trigger ─────────────────────────────────────────────────────── */
 
@@ -224,10 +338,10 @@
     user-select: none;
 }
 
-.floaty-dropdown-trigger:hover   { background: var(--background-modifier-hover); color: var(--text-normal); }
-.floaty-dropdown-trigger.is-open { background: var(--background-modifier-hover); color: var(--text-normal); }
+.floaty-dropdown-trigger:hover         { background: var(--background-modifier-hover); color: var(--text-normal); }
+.floaty-dropdown-trigger.is-open       { background: var(--background-modifier-hover); color: var(--text-normal); }
 .floaty-dropdown-trigger:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
-.floaty-dropdown-trigger svg { width: 14px; height: 14px; pointer-events: none; stroke-width: 2px; flex-shrink: 0; }
+.floaty-dropdown-trigger svg           { width: 14px; height: 14px; pointer-events: none; stroke-width: 2px; flex-shrink: 0; }
 
 .floaty-chevron { width: 10px; height: 10px; opacity: 0.5; transition: transform 150ms ease, opacity 150ms ease; }
 .floaty-dropdown-trigger.is-open .floaty-chevron { transform: rotate(180deg); opacity: 0.8; }
@@ -244,8 +358,8 @@
     border-radius: var(--radius-m);
     box-shadow:
         0 -4px 24px rgba(0, 0, 0, 0.18),
-        0 2px 8px rgba(0, 0, 0, 0.10),
-        0 0 0 1px var(--background-modifier-border);
+        0 2px 8px   rgba(0, 0, 0, 0.10),
+        0 0 0 1px   var(--background-modifier-border);
     animation: floaty-dropdown-in 160ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
@@ -265,7 +379,7 @@
 
 .floaty-dropdown-item:hover  { background: var(--background-modifier-hover); color: var(--text-normal); }
 .floaty-dropdown-item:active { background: var(--background-modifier-active-hover); }
-.floaty-dropdown-item svg { width: 14px; height: 14px; flex-shrink: 0; stroke-width: 2px; color: var(--text-faint); }
+.floaty-dropdown-item svg    { width: 14px; height: 14px; flex-shrink: 0; stroke-width: 2px; color: var(--text-faint); }
 .floaty-dropdown-item:hover svg { color: var(--text-muted); }
 
 .floaty-heading-badge {
@@ -309,13 +423,11 @@
     align-items: center;
     gap: 4px;
 }
-.floaty-hud-item:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-}
+
+.floaty-hud-item:hover          { background: var(--background-modifier-hover); color: var(--text-normal); }
 .floaty-hud-item.pomodoro-work  { color: var(--color-red); }
 .floaty-hud-item.pomodoro-break { color: var(--color-green); }
-.floaty-hud-item.hud-hidden { display: none !important; }
+.floaty-hud-item.hud-hidden     { display: none !important; }
 
 /* ── Dock HUD section ─────────────────────────────────────────────────────── */
 
@@ -338,12 +450,9 @@
                 transform 200ms cubic-bezier(0.34,1.56,0.64,1);
     user-select: none;
 }
-.floaty-dock-hud-item:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-    transform: scale(1.15) translateY(-3px);
-}
-.floaty-dock-hud-item:active { transform: scale(0.92) translateY(0); }
+
+.floaty-dock-hud-item:hover          { background: var(--background-modifier-hover); color: var(--text-normal); transform: scale(1.15) translateY(-3px); }
+.floaty-dock-hud-item:active         { transform: scale(0.92) translateY(0); }
 .floaty-dock-hud-item.pomodoro-work  { color: var(--color-red); }
 .floaty-dock-hud-item.pomodoro-break { color: var(--color-green); }
 
@@ -359,12 +468,13 @@
     border-radius: var(--radius-m);
     box-shadow:
         0 -4px 24px rgba(0,0,0,0.20),
-        0 2px 8px rgba(0,0,0,0.12),
-        0 0 0 1px var(--background-modifier-border);
+        0 2px 8px   rgba(0,0,0,0.12),
+        0 0 0 1px   var(--background-modifier-border);
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
+
 .floaty-hud-popover h3 {
     margin: 0 0 2px;
     font-size: 13px;
@@ -372,6 +482,7 @@
     color: var(--text-normal);
     font-family: var(--font-interface);
 }
+
 .floaty-hud-countdown {
     font-size: 36px;
     font-weight: 700;
@@ -382,8 +493,10 @@
     line-height: 1;
     padding: 4px 0;
 }
+
 .floaty-hud-countdown.phase-work  { color: var(--color-red); }
 .floaty-hud-countdown.phase-break { color: var(--color-green); }
+
 .floaty-hud-phase-label {
     text-align: center;
     font-size: 11px;
@@ -392,11 +505,9 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
-.floaty-hud-controls {
-    display: flex;
-    gap: 6px;
-    justify-content: center;
-}
+
+.floaty-hud-controls { display: flex; gap: 6px; justify-content: center; }
+
 .floaty-hud-btn {
     display: flex;
     align-items: center;
@@ -413,39 +524,102 @@
     transition: background 100ms ease, color 100ms ease;
     user-select: none;
 }
-.floaty-hud-btn:hover { background: var(--background-modifier-active-hover); color: var(--text-normal); }
-.floaty-hud-btn.primary {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: transparent;
-}
+
+.floaty-hud-btn:hover        { background: var(--background-modifier-active-hover); color: var(--text-normal); }
+.floaty-hud-btn.primary      { background: var(--interactive-accent); color: var(--text-on-accent); border-color: transparent; }
 .floaty-hud-btn.primary:hover { filter: brightness(1.1); }
+
 .floaty-hud-setting-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
 }
+
 .floaty-hud-setting-label {
     font-size: 12px;
     font-family: var(--font-interface);
     color: var(--text-muted);
     white-space: nowrap;
 }
-.floaty-hud-setting-row input[type="range"] {
-    flex: 1;
-    accent-color: var(--interactive-accent);
-    cursor: pointer;
-}
-.floaty-hud-setting-value {
-    font-size: 12px;
-    font-family: var(--font-monospace);
+
+.floaty-hud-setting-row input[type="range"] { flex: 1; accent-color: var(--interactive-accent); cursor: pointer; }
+.floaty-hud-setting-value { font-size: 12px; font-family: var(--font-monospace); color: var(--text-normal); min-width: 32px; text-align: right; }
+.floaty-hud-sep { height: 1px; background: var(--divider-color); margin: 0 -14px; }
+
+/* ── Settings panel — button order list ───────────────────────────────────── */
+
+.floaty-settings-heading {
+    margin-top: 24px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 600;
     color: var(--text-normal);
-    min-width: 32px;
-    text-align: right;
 }
-.floaty-hud-sep {
-    height: 1px;
-    background: var(--divider-color);
-    margin: 0 -14px;
+
+.floaty-settings-order-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 6px;
+    border: 1px solid var(--divider-color);
+    border-radius: var(--radius-m);
+    background: var(--background-secondary);
+}
+
+.floaty-settings-order-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    border: 1px solid transparent;
+    cursor: grab;
+    user-select: none;
+    transition: background 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+}
+
+.floaty-settings-order-row:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--divider-color);
+}
+
+.floaty-settings-order-row:active { cursor: grabbing; }
+
+.floaty-settings-order-row.floaty-settings-dragging {
+    opacity: 0.4;
+    background: var(--background-modifier-hover);
+}
+
+.floaty-settings-order-row.floaty-settings-drag-over {
+    border-color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.floaty-settings-drag-handle {
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.floaty-settings-drag-handle svg { width: 14px; height: 14px; stroke-width: 2px; }
+
+.floaty-settings-item-icon {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.floaty-settings-item-icon svg { width: 15px; height: 15px; stroke-width: 2px; }
+
+.floaty-settings-item-label {
+    font-size: 13px;
+    font-family: var(--font-interface);
+    color: var(--text-normal);
+    flex: 1;
 }

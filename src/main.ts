@@ -1,5 +1,5 @@
-import { Plugin, MarkdownView, Editor, EventRef, PluginSettingTab, App, Setting } from 'obsidian';
-import { FloatyToolbar } from './toolbar';
+import { Plugin, MarkdownView, Editor, EventRef, PluginSettingTab, App, Setting, setIcon } from 'obsidian';
+import { FloatyToolbar, ALL_ACTIONS, DEFAULT_BUTTON_ORDER, ToolbarItemId } from './toolbar';
 import { FloatyHud } from './hud';
 import {
     applyBold, applyItalic, applyStrikethrough, applyCode,
@@ -9,16 +9,18 @@ import {
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 export interface PluginSettings {
-    dockedMode: boolean;
-    smartUrl:   boolean;
+    dockedMode:  boolean;
+    smartUrl:    boolean;
+    buttonOrder: ToolbarItemId[];
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
-    dockedMode: false,
-    smartUrl:   false,
+    dockedMode:  false,
+    smartUrl:    false,
+    buttonOrder: [...DEFAULT_BUTTON_ORDER],
 };
 
-// ─── Settings tab — only smartUrl here, dockedMode is toggled via pin button ──
+// ─── Settings tab ─────────────────────────────────────────────────────────────
 
 class FloatySettingTab extends PluginSettingTab {
     plugin: FloatyToolbarPlugin;
@@ -28,15 +30,16 @@ class FloatySettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
+        // ── Smart URL ───────────────────────────────────────────────────────
         new Setting(containerEl)
             .setName('Smart URL detection')
-            .setDesc('When inserting a link, automatically paste a URL from your clipboard if one is detected. When disabled, a reminder notice will appear.')
+            .setDesc('When inserting a link, automatically paste a URL from your clipboard if one is detected.')
             .addToggle(t => t
                 .setValue(this.plugin.settings.smartUrl)
                 .onChange(async (v) => { this.plugin.settings.smartUrl = v; await this.plugin.saveSettings(); })
             );
 
-        // Read-only indicator for dock mode — user changes it via the pin button
+        // ── Dock mode (read-only indicator) ─────────────────────────────────
         new Setting(containerEl)
             .setName('Dock mode')
             .setDesc('Toggle between floating and dock mode using the pin icon (📌) inside the toolbar itself.')
@@ -44,13 +47,101 @@ class FloatySettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.dockedMode)
                 .setDisabled(true)
             );
+
+        // ── Button order ─────────────────────────────────────────────────────
+        containerEl.createEl('h3', { text: 'Toolbar button order', cls: 'floaty-settings-heading' });
+        containerEl.createEl('p', {
+            text: 'Drag to reorder. You can also long-press any button in the toolbar itself to drag it.',
+            cls: 'setting-item-description',
+        });
+
+        const listEl = containerEl.createEl('div', { cls: 'floaty-settings-order-list' });
+        this.renderOrderList(listEl);
+
+        new Setting(containerEl)
+            .addButton(btn => btn
+                .setButtonText('Reset to default')
+                .onClick(async () => {
+                    this.plugin.settings.buttonOrder = [...DEFAULT_BUTTON_ORDER];
+                    await this.plugin.saveSettings();
+                    this.renderOrderList(listEl);
+                })
+            );
+    }
+
+    private renderOrderList(listEl: HTMLElement): void {
+        listEl.empty();
+        const order = this.plugin.settings.buttonOrder;
+
+        // Labels for the two "virtual" items
+        const LABELS: Record<string, string> = {
+            bold: 'Bold', italic: 'Italic', strikethrough: 'Strikethrough',
+            code: 'Inline Code', highlight: 'Highlight', link: 'Insert Link',
+            heading: 'Heading', callout: 'Callout',
+        };
+        const ICONS: Record<string, string> = {
+            bold: 'bold', italic: 'italic', strikethrough: 'strikethrough',
+            code: 'code', highlight: 'highlighter', link: 'link',
+            heading: 'heading-1', callout: 'quote-glyph',
+        };
+
+        let dragSrc: HTMLElement | null = null;
+
+        for (const id of order) {
+            const row = listEl.createEl('div', { cls: 'floaty-settings-order-row', attr: { draggable: 'true' } });
+
+            const handle = row.createEl('span', { cls: 'floaty-settings-drag-handle' });
+            setIcon(handle, 'grip-vertical');
+
+            const iconEl = row.createEl('span', { cls: 'floaty-settings-item-icon' });
+            setIcon(iconEl, ICONS[id] ?? 'circle');
+
+            row.createEl('span', { cls: 'floaty-settings-item-label', text: LABELS[id] ?? id });
+
+            // HTML5 drag-and-drop for the settings panel
+            row.addEventListener('dragstart', () => {
+                dragSrc = row;
+                setTimeout(() => row.addClass('floaty-settings-dragging'), 0);
+            });
+            row.addEventListener('dragend', () => {
+                row.removeClass('floaty-settings-dragging');
+                listEl.querySelectorAll<HTMLElement>('.floaty-settings-drag-over')
+                    .forEach(el => el.removeClass('floaty-settings-drag-over'));
+                dragSrc = null;
+            });
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (dragSrc && dragSrc !== row) row.addClass('floaty-settings-drag-over');
+            });
+            row.addEventListener('dragleave', () => row.removeClass('floaty-settings-drag-over'));
+            row.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                row.removeClass('floaty-settings-drag-over');
+                if (!dragSrc || dragSrc === row) return;
+
+                const srcId  = dragSrc.querySelector<HTMLElement>('.floaty-settings-item-label')?.textContent;
+                const dstId  = row.querySelector<HTMLElement>('.floaty-settings-item-label')?.textContent;
+                const srcKey = Object.keys(LABELS).find(k => LABELS[k] === srcId) as ToolbarItemId | undefined;
+                const dstKey = Object.keys(LABELS).find(k => LABELS[k] === dstId) as ToolbarItemId | undefined;
+
+                if (!srcKey || !dstKey) return;
+
+                const arr = [...this.plugin.settings.buttonOrder];
+                const fi  = arr.indexOf(srcKey);
+                const ti  = arr.indexOf(dstKey);
+                if (fi === -1 || ti === -1) return;
+                arr.splice(fi, 1);
+                arr.splice(ti, 0, srcKey);
+                this.plugin.settings.buttonOrder = arr;
+                await this.plugin.saveSettings();
+                this.renderOrderList(listEl);
+            });
+        }
     }
 }
 
 // ─── Workspace event interface ────────────────────────────────────────────────
-// `editor-selection-change` is a real Obsidian workspace event but is not
-// included in the public TypeScript typings. The cast lets us register it
-// without disabling type-checking for the whole file.
+
 interface WorkspaceWithEvents {
     on(name: 'editor-selection-change', callback: (editor: Editor, view: MarkdownView) => void): EventRef;
 }
@@ -71,26 +162,33 @@ export default class FloatyToolbarPlugin extends Plugin {
         this.toolbar.hud = this.hud;
         this.addSettingTab(new FloatySettingTab(this.app, this));
 
-        // Wire up pin toggle — instant switch, no reload needed
+        // Wire up button reorder — rebuild toolbar so new order takes effect immediately
+        this.toolbar.onButtonReorder = async (newOrder: ToolbarItemId[]) => {
+            this.settings.buttonOrder = newOrder;
+            await this.saveSettings();
+            // Rebuild the dock in-place so the new order is visible immediately
+            if (this.settings.dockedMode) {
+                this.toolbar.destroy();
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
+            }
+        };
+
+        // Wire up pin toggle
         this.toolbar.onPinToggle = (docked: boolean) => {
             void (async () => {
                 this.settings.dockedMode = docked;
                 await this.saveSettings();
                 if (!docked) {
                     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                    const sel = view?.editor.getSelection();
+                    const sel  = view?.editor.getSelection();
                     if (sel && sel.length > 0) {
-                        // Text is selected — switch straight to floating toolbar
                         this.toolbar.destroy();
                         this.toolbar.show(view!.editor, this.lastMousePos, this.settings);
                     } else {
-                        // Nothing selected — animate dock out, then vanish
-                        this.toolbar.destroyDockAnimated(() => {
-                            this.toolbar.destroy();
-                        });
+                        this.toolbar.destroyDockAnimated(() => { this.toolbar.destroy(); });
                     }
                 } else {
-                    // Tear everything down and remount in dock mode
                     this.toolbar.destroy();
                     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                     if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
@@ -174,9 +272,7 @@ export default class FloatyToolbarPlugin extends Plugin {
         if (this.settings.dockedMode) {
             this.app.workspace.onLayoutReady(() => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (view) {
-                    this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
-                }
+                if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
             });
         }
     }
@@ -185,6 +281,12 @@ export default class FloatyToolbarPlugin extends Plugin {
 
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<PluginSettings>);
+        // Ensure buttonOrder always has all items (handles upgrades from older versions)
+        const saved = new Set(this.settings.buttonOrder);
+        for (const id of DEFAULT_BUTTON_ORDER) {
+            if (!saved.has(id)) this.settings.buttonOrder.push(id);
+        }
     }
+
     async saveSettings() { await this.saveData(this.settings); }
 }
