@@ -1,97 +1,22 @@
 import { Editor, setIcon } from 'obsidian';
 import {
-    applyBold, applyItalic, applyStrikethrough, applyCode,
-    applyHighlight, applyLink, applyHeading, applyCallout,
-    getSelectionRect, CalloutType,
+    applyHeading, applyCallout,
+    getSelectionRect,
 } from './utils';
 import type { PluginSettings } from './main';
 import type { FloatyHud } from './hud';
+import {
+    IconAction, ToolbarItemId,
+    ALL_ACTIONS, DEFAULT_BUTTON_ORDER,
+    HEADING_OPTIONS, CALLOUT_OPTIONS,
+    TOOLBAR_W_ESTIMATE, TOOLBAR_H_ESTIMATE, GAP, LONG_PRESS_MS,
+} from './toolbar-types';
+import { hideTooltip, attachTooltip } from './tooltip';
+import { startDrag } from './drag';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface IconAction {
-    id:      string;
-    icon:    string;
-    tooltip: string;
-    action:  (editor: Editor, settings: PluginSettings) => void | Promise<void>;
-}
-
-export type ToolbarItemId =
-    | 'bold' | 'italic' | 'strikethrough' | 'code' | 'highlight' | 'link'
-    | 'heading' | 'callout';
-
-// All available actions — id is the stable key stored in settings
-export const ALL_ACTIONS: IconAction[] = [
-    { id: 'bold',          icon: 'bold',          tooltip: 'Bold',          action: (e)    => applyBold(e) },
-    { id: 'italic',        icon: 'italic',        tooltip: 'Italic',        action: (e)    => applyItalic(e) },
-    { id: 'strikethrough', icon: 'strikethrough', tooltip: 'Strikethrough', action: (e)    => applyStrikethrough(e) },
-    { id: 'code',          icon: 'code',          tooltip: 'Inline Code',   action: (e)    => applyCode(e) },
-    { id: 'highlight',     icon: 'highlighter',   tooltip: 'Highlight',     action: (e)    => applyHighlight(e) },
-    { id: 'link',          icon: 'link',          tooltip: 'Insert Link',   action: (e, s) => applyLink(e, s.smartUrl) },
-];
-
-export const DEFAULT_BUTTON_ORDER: ToolbarItemId[] = [
-    'bold', 'italic', 'strikethrough', 'code', 'highlight', 'link', 'heading', 'callout',
-];
-
-const HEADING_OPTIONS: { label: string; level: 0 | 1 | 2 | 3 | 4 }[] = [
-    { label: 'H1', level: 1 }, { label: 'H2', level: 2 },
-    { label: 'H3', level: 3 }, { label: 'H4', level: 4 },
-    { label: 'Plain', level: 0 },
-];
-
-const CALLOUT_OPTIONS: { label: string; type: CalloutType; icon: string }[] = [
-    { label: 'Note',      type: 'note',      icon: 'info' },
-    { label: 'Tip',       type: 'tip',       icon: 'lightbulb' },
-    { label: 'Warning',   type: 'warning',   icon: 'alert-triangle' },
-    { label: 'Important', type: 'important', icon: 'alert-circle' },
-    { label: 'Caution',   type: 'caution',   icon: 'flame' },
-];
-
-const TOOLBAR_W_ESTIMATE = 420;
-const TOOLBAR_H_ESTIMATE = 44;
-const GAP                = 10;
-
-// Long-press threshold in ms before drag mode activates
-const LONG_PRESS_MS = 500;
-
-// ─── Tooltip system ───────────────────────────────────────────────────────────
-
-let tooltipEl:    HTMLElement | null              = null;
-let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
-
-function showTooltip(text: string, anchor: HTMLElement, above: boolean): void {
-    hideTooltip();
-    tooltipTimer = setTimeout(() => {
-        const tip = document.body.createEl('div', { cls: 'floaty-custom-tooltip', text });
-        tooltipEl  = tip;
-
-        const r = anchor.getBoundingClientRect();
-        tip.addClass('floaty-measuring');
-
-        requestAnimationFrame(() => {
-            const tw   = tip.offsetWidth;
-            let   left = r.left + r.width / 2 - tw / 2;
-            left        = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
-            const top   = above ? r.top - tip.offsetHeight - 6 : r.bottom + 6;
-            tip.style.left = `${left}px`;
-            tip.style.top  = `${top}px`;
-            tip.removeClass('floaty-measuring');
-        });
-    }, 400);
-}
-
-function hideTooltip(): void {
-    if (tooltipTimer !== null) { clearTimeout(tooltipTimer); tooltipTimer = null; }
-    tooltipEl?.remove();
-    tooltipEl = null;
-}
-
-function attachTooltip(el: HTMLElement, text: string, above: boolean): void {
-    el.addEventListener('mouseenter', () => showTooltip(text, el, above));
-    el.addEventListener('mouseleave', hideTooltip);
-    el.addEventListener('mousedown',  hideTooltip);
-}
+// Re-export the public API so main.ts import path stays unchanged
+export type { IconAction, ToolbarItemId };
+export { ALL_ACTIONS, DEFAULT_BUTTON_ORDER };
 
 // ─── SVG helpers ──────────────────────────────────────────────────────────────
 
@@ -110,138 +35,15 @@ function createChevronSvg(): SVGSVGElement {
     return svg;
 }
 
-// ─── Drag-reorder state ───────────────────────────────────────────────────────
-
-interface DragState {
-    itemId:       ToolbarItemId;
-    sourceEl:     HTMLElement;
-    ghostEl:      HTMLElement;
-    containerEl:  HTMLElement;
-    offsetX:      number;
-    offsetY:      number;
-    isDock:       boolean;
-    onReorder:    (newOrder: ToolbarItemId[]) => void;
-}
-
-let activeDrag: DragState | null = null;
-
-function startDrag(
-    itemId:      ToolbarItemId,
-    sourceEl:    HTMLElement,
-    containerEl: HTMLElement,
-    startEvt:    MouseEvent,
-    isDock:      boolean,
-    onReorder:   (newOrder: ToolbarItemId[]) => void
-): void {
-    if (activeDrag) return;
-    hideTooltip();
-
-    // Ghost: visual copy of the button that follows the cursor
-    const rect  = sourceEl.getBoundingClientRect();
-    const ghost = document.body.createEl('div', { cls: 'floaty-drag-ghost' });
-    ghost.style.width  = `${rect.width}px`;
-    ghost.style.height = `${rect.height}px`;
-    ghost.style.left   = `${rect.left}px`;
-    ghost.style.top    = `${rect.top}px`;
-    // Copy the inner icon
-    ghost.innerHTML = sourceEl.innerHTML;
-
-    sourceEl.addClass('floaty-drag-source');
-
-    activeDrag = {
-        itemId, sourceEl, ghostEl: ghost, containerEl,
-        offsetX: startEvt.clientX - rect.left,
-        offsetY: startEvt.clientY - rect.top,
-        isDock, onReorder,
-    };
-
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup',   onDragEnd, { once: true });
-}
-
-function onDragMove(e: MouseEvent): void {
-    if (!activeDrag) return;
-    const { ghostEl, offsetX, offsetY } = activeDrag;
-    ghostEl.style.left = `${e.clientX - offsetX}px`;
-    ghostEl.style.top  = `${e.clientY - offsetY}px`;
-
-    // Find drop target
-    const target = findDropTarget(e.clientX, e.clientY, activeDrag);
-    highlightDropTarget(target);
-}
-
-function onDragEnd(e: MouseEvent): void {
-    if (!activeDrag) return;
-    document.removeEventListener('mousemove', onDragMove);
-
-    const { sourceEl, ghostEl, containerEl, itemId, onReorder } = activeDrag;
-
-    const target = findDropTarget(e.clientX, e.clientY, activeDrag);
-    clearDropHighlights(containerEl);
-
-    ghostEl.remove();
-    sourceEl.removeClass('floaty-drag-source');
-
-    if (target && target !== itemId) {
-        // Build new order by swapping itemId into target's position
-        const draggableItems = Array.from(
-            containerEl.querySelectorAll<HTMLElement>('[data-floaty-id]')
-        ).map(el => el.dataset.floatyId as ToolbarItemId);
-
-        const fromIdx = draggableItems.indexOf(itemId);
-        const toIdx   = draggableItems.indexOf(target);
-        if (fromIdx !== -1 && toIdx !== -1) {
-            draggableItems.splice(fromIdx, 1);
-            draggableItems.splice(toIdx, 0, itemId);
-            onReorder(draggableItems);
-        }
-    }
-
-    activeDrag = null;
-}
-
-function findDropTarget(x: number, y: number, drag: DragState): ToolbarItemId | null {
-    const items = Array.from(
-        drag.containerEl.querySelectorAll<HTMLElement>('[data-floaty-id]')
-    );
-    for (const el of items) {
-        const r = el.getBoundingClientRect();
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            return el.dataset.floatyId as ToolbarItemId;
-        }
-    }
-    return null;
-}
-
-function highlightDropTarget(targetId: ToolbarItemId | null): void {
-    if (!activeDrag) return;
-    const items = Array.from(
-        activeDrag.containerEl.querySelectorAll<HTMLElement>('[data-floaty-id]')
-    );
-    for (const el of items) {
-        if (el.dataset.floatyId === targetId && targetId !== activeDrag.itemId) {
-            el.addClass('floaty-drop-target');
-        } else {
-            el.removeClass('floaty-drop-target');
-        }
-    }
-}
-
-function clearDropHighlights(container: HTMLElement): void {
-    container.querySelectorAll<HTMLElement>('.floaty-drop-target')
-        .forEach(el => el.removeClass('floaty-drop-target'));
-}
-
 // ─── FloatyToolbar ────────────────────────────────────────────────────────────
 
 export class FloatyToolbar {
     private containerEl: HTMLElement | null = null;
     private hideTimer:   ReturnType<typeof setTimeout> | null = null;
 
-    private dockEl:       HTMLElement | null      = null;
-    private dockEditor:   Editor | null           = null;
-    private dockSettings: PluginSettings | null   = null;
-    private dockIsVisible                         = false;
+    private dockEl:       HTMLElement | null    = null;
+    private dockEditor:   Editor | null         = null;
+    private dockIsVisible                       = false;
     private dockAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Peek state — the two-phase reveal
@@ -294,14 +96,12 @@ export class FloatyToolbar {
 
     private mountDock(editor: Editor, settings: PluginSettings): void {
         this.dockEditor   = editor;
-        this.dockSettings = settings;
 
         if (this.dockEl) {
             // Dock already exists — just update editor ref. Do NOT call dockReveal()
             // here: that would cancel the auto-hide timer every time a selection
             // change fires, making the dock impossible to hide while typing.
             this.dockEditor   = editor;
-            this.dockSettings = settings;
             // If the dock is hidden, reveal it (e.g. user switched notes)
             if (!this.dockIsVisible && !this.dockIsPeeking) {
                 this.dockReveal();
@@ -334,8 +134,6 @@ export class FloatyToolbar {
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             if (this.openDropdown) return;
             if (this.dockEl?.contains(e.target as Node)) return;
-            // eslint-disable-next-line no-console
-            console.log('[floaty] keydown fired, dockIsVisible=', this.dockIsVisible, 'key=', e.key);
             this.dockAutoHide();
         };
         document.addEventListener('keydown', this._onKeyDown, true);
@@ -349,8 +147,6 @@ export class FloatyToolbar {
                 this.cancelPeek();
                 this.dockReveal();
             } else if (fromBottom <= 72) {
-                // eslint-disable-next-line no-console
-                console.log('[floaty] mousemove in peek zone — fromBottom=', fromBottom, 'dockIsVisible=', this.dockIsVisible, 'dockIsPeeking=', this.dockIsPeeking, 'classes=', this.dockEl?.className);
                 // Outer hot zone → start peek if not already visible or peeking
                 if (!this.dockIsVisible && !this.dockIsPeeking) {
                     this.startPeek();
@@ -378,27 +174,21 @@ export class FloatyToolbar {
         });
     }
 
-    // Two-phase reveal: first a tiny peek, then full rise on continued hover
+    // ── Dock: two-phase reveal (peek → full) ──────────────────────────────────
+
     private startPeek(): void {
-        // eslint-disable-next-line no-console
-        console.log('[floaty] startPeek called — dockIsPeeking=', this.dockIsPeeking, 'dockIsVisible=', this.dockIsVisible, 'dockEl=', !!this.dockEl, 'classes=', this.dockEl?.className);
         if (this.dockIsPeeking || this.dockIsVisible || !this.dockEl) return;
         this.dockIsPeeking = true;
         this.dockEl.addClass('dock-peeking');
-        // eslint-disable-next-line no-console
-        console.log('[floaty] startPeek — added dock-peeking, classes now=', this.dockEl.className);
 
         // After a short delay, if mouse is still in zone, do full reveal
         this.dockPeekTimer = setTimeout(() => {
             this.dockPeekTimer = null;
-            // Check mouse is still near bottom — _onMouseMove will have called
-            // dockReveal() already if they moved into the 72px zone
+            // _onMouseMove will call dockReveal() if still in the zone
         }, 300);
     }
 
     private cancelPeek(): void {
-        // eslint-disable-next-line no-console
-        console.log('[floaty] cancelPeek called — dockIsPeeking=', this.dockIsPeeking, 'dockIsVisible=', this.dockIsVisible);
         if (this.dockPeekTimer !== null) { clearTimeout(this.dockPeekTimer); this.dockPeekTimer = null; }
         if (this.dockIsPeeking && !this.dockIsVisible) {
             this.dockEl?.removeClass('dock-peeking');
@@ -420,27 +210,12 @@ export class FloatyToolbar {
         this.dockIsPeeking = false;
     }
 
-    // Called by mountDock when the dock already exists and the editor fires
-    // selection-change. We intentionally do NOT cancel the auto-hide timer here —
-    // the dock is already mounted and the selection change doesn't mean the user
-    // wants it visible again (keystrokes handle auto-hide separately).
-    private dockRefreshEditor(editor: Editor, settings: PluginSettings): void {
-        this.dockEditor   = editor;
-        this.dockSettings = settings;
-        // Only reveal if already visible; don't fight the auto-hide timer
-        if (this.dockIsVisible) return;
-    }
+    // ── Dock: auto-hide ───────────────────────────────────────────────────────
 
     private dockAutoHide(): void {
-        // eslint-disable-next-line no-console
-        console.log('[floaty] dockAutoHide called, dockIsVisible=', this.dockIsVisible, 'dockEl=', !!this.dockEl);
         if (!this.dockEl || !this.dockIsVisible) return;
         if (this.dockAutoHideTimer !== null) clearTimeout(this.dockAutoHideTimer);
-        // eslint-disable-next-line no-console
-        console.log('[floaty] scheduling hide in 1200ms');
         this.dockAutoHideTimer = setTimeout(() => {
-            // eslint-disable-next-line no-console
-            console.log('[floaty] hide timer fired, dockEl=', !!this.dockEl, 'classes=', this.dockEl?.className);
             if (!this.dockEl) return;
             this.dockEl.removeClass('dock-visible');
             // Force a reflow so the browser flushes the dock-visible style before
@@ -448,8 +223,6 @@ export class FloatyToolbar {
             // base opacity/transform transition fights the keyframe animation.
             void this.dockEl.offsetWidth;
             this.dockEl.addClass('dock-hiding');
-            // eslint-disable-next-line no-console
-            console.log('[floaty] classes after adding dock-hiding:', this.dockEl.className);
 
             // dock-hiding uses an animation (not a transition), so listen for animationend
             this.dockIsVisible    = false;
@@ -459,8 +232,6 @@ export class FloatyToolbar {
             const onEnd = () => {
                 if (ended) return;
                 ended = true;
-                // eslint-disable-next-line no-console
-                console.log('[floaty] animationend/fallback fired, switching to dock-hidden');
                 this.dockEl?.removeClass('dock-hiding');
                 this.dockEl?.addClass('dock-hidden');
             };
@@ -469,6 +240,8 @@ export class FloatyToolbar {
             setTimeout(onEnd, 400);
         }, 1200);
     }
+
+    // ── Dock: lifecycle ───────────────────────────────────────────────────────
 
     private destroyDock(): void {
         this.hud?.setDockedMode(false, null);
@@ -481,7 +254,6 @@ export class FloatyToolbar {
         this.dockEl?.remove();
         this.dockEl        = null;
         this.dockEditor    = null;
-        this.dockSettings  = null;
         this.dockIsVisible = false;
         this.dockIsPeeking = false;
     }
@@ -504,7 +276,6 @@ export class FloatyToolbar {
         setTimeout(finish, 400);
         this.dockEl        = null;
         this.dockEditor    = null;
-        this.dockSettings  = null;
         this.dockIsVisible = false;
         this.dockIsPeeking = false;
     }
@@ -547,7 +318,35 @@ export class FloatyToolbar {
         }, { once: true });
     }
 
-    // ── Build content ─────────────────────────────────────────────────────────
+    // ── Position (floating) ───────────────────────────────────────────────────
+
+    private positionToolbar(mouse: { x: number; y: number }): void {
+        if (!this.containerEl) return;
+        const selRect = getSelectionRect();
+        let anchorX: number, anchorTop: number, anchorBottom: number;
+
+        if (selRect && selRect.height > 0) {
+            anchorX = selRect.left + selRect.width / 2;
+            anchorTop    = selRect.top;
+            anchorBottom = selRect.bottom;
+        } else {
+            anchorX = mouse.x; anchorTop = mouse.y; anchorBottom = mouse.y;
+        }
+
+        const tbRect = this.containerEl.getBoundingClientRect();
+        const tbW    = tbRect.width  || TOOLBAR_W_ESTIMATE;
+        const tbH    = tbRect.height || TOOLBAR_H_ESTIMATE;
+
+        let left = anchorX - tbW / 2;
+        let top  = anchorTop - tbH - GAP;
+        left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
+        if (top < 8) top = anchorBottom + GAP;
+
+        this.containerEl.style.left = `${left}px`;
+        this.containerEl.style.top  = `${top}px`;
+    }
+
+    // ── Build toolbar content ─────────────────────────────────────────────────
 
     private buildToolbarContent(
         container:  HTMLElement,
@@ -757,34 +556,6 @@ export class FloatyToolbar {
         };
         trigger.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); open(); });
         trigger.addEventListener('keydown',   (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-    }
-
-    // ── Position (floating) ───────────────────────────────────────────────────
-
-    private positionToolbar(mouse: { x: number; y: number }): void {
-        if (!this.containerEl) return;
-        const selRect = getSelectionRect();
-        let anchorX: number, anchorTop: number, anchorBottom: number;
-
-        if (selRect && selRect.height > 0) {
-            anchorX = selRect.left + selRect.width / 2;
-            anchorTop    = selRect.top;
-            anchorBottom = selRect.bottom;
-        } else {
-            anchorX = mouse.x; anchorTop = mouse.y; anchorBottom = mouse.y;
-        }
-
-        const tbRect = this.containerEl.getBoundingClientRect();
-        const tbW    = tbRect.width  || TOOLBAR_W_ESTIMATE;
-        const tbH    = tbRect.height || TOOLBAR_H_ESTIMATE;
-
-        let left = anchorX - tbW / 2;
-        let top  = anchorTop - tbH - GAP;
-        left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
-        if (top < 8) top = anchorBottom + GAP;
-
-        this.containerEl.style.left = `${left}px`;
-        this.containerEl.style.top  = `${top}px`;
     }
 
     // ── Action button ─────────────────────────────────────────────────────────
