@@ -69,7 +69,7 @@ export async function applyLink(editor: Editor, smartUrl: boolean): Promise<void
         if (!smartUrlNoticeSeen) {
             smartUrlNoticeSeen = true;
             new Notice(
-                'Tip: Enable "Smart URL" in Floaty Toolbar settings to auto-paste URLs from clipboard. 💡',
+                'Tip: turn on "smart URL detection" in settings to paste a URL from clipboard. 💡',
                 6000
             );
         }
