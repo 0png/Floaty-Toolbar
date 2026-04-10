@@ -6,31 +6,23 @@ type PomodoroPhase = 'idle' | 'work' | 'break';
 
 // ─── Popover helper ───────────────────────────────────────────────────────────
 
-function openPopover(
-    anchorEl: HTMLElement,
-    build: (panel: HTMLElement) => void
-): HTMLElement {
-    // Close any existing popovers
+function openPopover(anchorEl: HTMLElement, build: (panel: HTMLElement) => void): HTMLElement {
     document.querySelectorAll('.floaty-hud-popover').forEach(el => el.remove());
-
     const panel = document.body.createEl('div', { cls: 'floaty-hud-popover' });
     build(panel);
 
-    // Position above the anchor — start invisible while measuring
-    const ar = anchorEl.getBoundingClientRect();
-    panel.addClass('is-measuring');
-    panel.setCssStyles({ left: `${ar.left}px`, top: '0px' });
+    // Position: prefer above the anchor, clamp to viewport
+    panel.setCssProps({ visibility: 'hidden', position: 'fixed', left: '0px', top: '0px' });
 
     requestAnimationFrame(() => {
+        const ar = anchorEl.getBoundingClientRect();
         const pr = panel.getBoundingClientRect();
         let left = ar.left + ar.width / 2 - pr.width / 2;
         left = Math.max(8, Math.min(left, window.innerWidth - pr.width - 8));
-        const top = ar.top - pr.height - 8;
-        panel.setCssStyles({ left: `${left}px`, top: `${Math.max(8, top)}px` });
-        panel.removeClass('is-measuring');
+        const top = Math.max(8, ar.top - pr.height - 8);
+        panel.setCssProps({ left: `${left}px`, top: `${top}px`, visibility: '' });
     });
 
-    // Close on outside click
     const onOutside = (e: MouseEvent) => {
         if (!panel.contains(e.target as Node) && !anchorEl.contains(e.target as Node)) {
             panel.remove();
@@ -38,31 +30,36 @@ function openPopover(
         }
     };
     setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
     return panel;
 }
 
-// ─── HUD class ────────────────────────────────────────────────────────────────
+// ─── FloatyHud ────────────────────────────────────────────────────────────────
 
 export class FloatyHud {
     private plugin: Plugin;
 
-    // Pomodoro state
+    // Pomodoro
     private pomPhase: PomodoroPhase = 'idle';
-    private pomRemaining  = 0;   // seconds
-    private pomWorkMins   = 25;
-    private pomBreakMins  = 5;
+    private pomRemaining = 0;
+    private pomWorkMins  = 25;
+    private pomBreakMins = 5;
     private pomTimer: ReturnType<typeof setInterval> | null = null;
-    private pomBarItem: HTMLElement | null = null;
 
-    // Session timer (counts up from plugin load)
-    private sessionStart   = Date.now();
+    // Status bar elements (always created, shown/hidden via CSS)
+    private pomBarItem:     HTMLElement | null = null;
     private sessionBarItem: HTMLElement | null = null;
-    private sessionTimer: ReturnType<typeof setInterval> | null = null;
+    private fileBarItem:    HTMLElement | null = null;
 
-    // File timer (counts up from file open)
+    // Dock HUD elements (created when dock is mounted, removed when not)
+    private dockHudSection: HTMLElement | null = null;
+    private pomDockItem:     HTMLElement | null = null;
+    private sessionDockItem: HTMLElement | null = null;
+    private fileDockItem:    HTMLElement | null = null;
+
+    // Timers
+    private sessionStart = Date.now();
+    private sessionTimer: ReturnType<typeof setInterval> | null = null;
     private fileStart: number | null = null;
-    private fileBarItem: HTMLElement | null = null;
     private fileTimer: ReturnType<typeof setInterval> | null = null;
     private currentFile: string | null = null;
 
@@ -72,29 +69,190 @@ export class FloatyHud {
 
     // ── Public ────────────────────────────────────────────────────────────────
 
+    /** Call once on plugin load. Always creates status bar items. */
     mount(): void {
-        this.mountPomodoro();
-        this.mountSessionTimer();
-        this.mountFileTimer();
+        this.mountStatusBarItems();
+        this.startTimers();
+    }
+
+    /**
+     * Call whenever docked mode changes.
+     * dockEl = the dock container element (pass null when undocking).
+     */
+    setDockedMode(docked: boolean, dockEl: HTMLElement | null): void {
+        if (docked && dockEl) {
+            // Hide status bar items
+            this.pomBarItem?.addClass('hud-hidden');
+            this.sessionBarItem?.addClass('hud-hidden');
+            this.fileBarItem?.addClass('hud-hidden');
+            // Inject HUD section into dock
+            this.mountDockHud(dockEl);
+        } else {
+            // Remove dock HUD section
+            this.unmountDockHud();
+            // Show status bar items again
+            this.pomBarItem?.removeClass('hud-hidden');
+            this.sessionBarItem?.removeClass('hud-hidden');
+            this.fileBarItem?.removeClass('hud-hidden');
+        }
     }
 
     destroy(): void {
-        this.pomStop();
+        this.pomPause();
         if (this.sessionTimer) { clearInterval(this.sessionTimer); this.sessionTimer = null; }
         if (this.fileTimer)    { clearInterval(this.fileTimer);    this.fileTimer    = null; }
+        this.unmountDockHud();
         document.querySelectorAll('.floaty-hud-popover').forEach(el => el.remove());
     }
 
-    // ── Pomodoro ──────────────────────────────────────────────────────────────
+    // ── Status bar items ──────────────────────────────────────────────────────
 
-    private mountPomodoro(): void {
-        const item = this.plugin.addStatusBarItem();
-        item.addClass('floaty-hud-item');
-        this.pomBarItem = item;
-        this.pomUpdateBar();
+    private mountStatusBarItems(): void {
+        // Pomodoro
+        const pomItem = this.plugin.addStatusBarItem();
+        pomItem.addClass('floaty-hud-item');
+        this.pomBarItem = pomItem;
+        this.pomRenderInto(pomItem);
+        pomItem.addEventListener('click', () => this.openPomodoroPopover(pomItem));
 
-        item.addEventListener('click', () => this.openPomodoroPopover(item));
+        // Session timer
+        const sessItem = this.plugin.addStatusBarItem();
+        sessItem.addClass('floaty-hud-item');
+        sessItem.setAttribute('aria-label', 'Session time — click to reset');
+        this.sessionBarItem = sessItem;
+        this.renderSessionInto(sessItem);
+        sessItem.addEventListener('click', () => {
+            this.sessionStart = Date.now();
+            this.renderSessionInto(sessItem);
+        });
+
+        // File timer
+        const fileItem = this.plugin.addStatusBarItem();
+        fileItem.addClass('floaty-hud-item');
+        fileItem.setAttribute('aria-label', 'Time on current file');
+        this.fileBarItem = fileItem;
+        this.renderFileInto(fileItem);
     }
+
+    // ── Dock HUD section ──────────────────────────────────────────────────────
+
+    private mountDockHud(dockEl: HTMLElement): void {
+        this.unmountDockHud(); // clean up any leftover
+
+        // Separator before HUD section
+        const section = dockEl.createEl('div', { cls: 'floaty-dock-hud-section' });
+        this.dockHudSection = section;
+
+        // Divider
+        section.createEl('div', { cls: 'floaty-divider' });
+
+        // Pomodoro
+        const pomItem = section.createEl('div', { cls: 'floaty-dock-hud-item' });
+        this.pomDockItem = pomItem;
+        this.pomRenderInto(pomItem);
+        pomItem.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            this.openPomodoroPopover(pomItem);
+        });
+
+        // Session timer
+        const sessItem = section.createEl('div', { cls: 'floaty-dock-hud-item' });
+        this.sessionDockItem = sessItem;
+        this.renderSessionInto(sessItem);
+        sessItem.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            this.sessionStart = Date.now();
+            this.renderSessionInto(sessItem);
+            this.renderSessionInto(this.sessionBarItem);
+        });
+
+        // File timer
+        const fileItem = section.createEl('div', { cls: 'floaty-dock-hud-item' });
+        this.fileDockItem = fileItem;
+        this.renderFileInto(fileItem);
+    }
+
+    private unmountDockHud(): void {
+        this.dockHudSection?.remove();
+        this.dockHudSection  = null;
+        this.pomDockItem     = null;
+        this.sessionDockItem = null;
+        this.fileDockItem    = null;
+    }
+
+    // ── Timers ────────────────────────────────────────────────────────────────
+
+    private startTimers(): void {
+        this.sessionTimer = setInterval(() => {
+            this.renderSessionInto(this.sessionBarItem);
+            this.renderSessionInto(this.sessionDockItem);
+        }, 1000);
+
+        this.fileTimer = setInterval(() => {
+            this.renderFileInto(this.fileBarItem);
+            this.renderFileInto(this.fileDockItem);
+        }, 1000);
+
+        // Track file switches
+        this.plugin.registerEvent(
+            this.plugin.app.workspace.on('file-open', (file: TFile | null) => {
+                const path = file?.path ?? null;
+                if (path !== this.currentFile) {
+                    this.currentFile = path;
+                    this.fileStart   = file ? Date.now() : null;
+                    this.renderFileInto(this.fileBarItem);
+                    this.renderFileInto(this.fileDockItem);
+                }
+            })
+        );
+    }
+
+    // ── Render helpers ────────────────────────────────────────────────────────
+
+    /** Renders pomodoro state into any element (status bar or dock). */
+    private pomRenderInto(el: HTMLElement | null): void {
+        if (!el) return;
+        el.empty();
+        el.removeClass('pomodoro-work', 'pomodoro-break');
+
+        if (this.pomPhase === 'idle') {
+            el.createSpan({ text: '🍅' });
+            el.createSpan({ text: `${String(this.pomWorkMins).padStart(2,'0')}:00` });
+        } else {
+            const mins = Math.floor(this.pomRemaining / 60).toString().padStart(2, '0');
+            const secs = (this.pomRemaining % 60).toString().padStart(2, '0');
+            el.createSpan({ text: this.pomPhase === 'work' ? '🍅' : '☕' });
+            el.createSpan({ text: `${mins}:${secs}` });
+            el.addClass(this.pomPhase === 'work' ? 'pomodoro-work' : 'pomodoro-break');
+        }
+    }
+
+    private renderSessionInto(el: HTMLElement | null): void {
+        if (!el) return;
+        const elapsed = Math.floor((Date.now() - this.sessionStart) / 1000);
+        el.empty();
+        el.createSpan({ text: '⏱' });
+        el.createSpan({ text: this.formatDuration(elapsed) });
+    }
+
+    private renderFileInto(el: HTMLElement | null): void {
+        if (!el) return;
+        el.empty();
+        el.createSpan({ text: '📄' });
+        if (this.fileStart === null) {
+            el.createSpan({ text: '--:--' });
+        } else {
+            const elapsed = Math.floor((Date.now() - this.fileStart) / 1000);
+            el.createSpan({ text: this.formatDuration(elapsed) });
+        }
+    }
+
+    private pomRefreshAll(): void {
+        this.pomRenderInto(this.pomBarItem);
+        this.pomRenderInto(this.pomDockItem);
+    }
+
+    // ── Pomodoro logic ────────────────────────────────────────────────────────
 
     private pomStart(): void {
         if (this.pomPhase === 'idle') {
@@ -104,10 +262,8 @@ export class FloatyHud {
         if (this.pomTimer) return;
         this.pomTimer = setInterval(() => {
             this.pomRemaining--;
-            this.pomUpdateBar();
-            if (this.pomRemaining <= 0) {
-                this.pomTick();
-            }
+            this.pomRefreshAll();
+            if (this.pomRemaining <= 0) this.pomTick();
         }, 1000);
     }
 
@@ -117,78 +273,57 @@ export class FloatyHud {
 
     private pomStop(): void {
         this.pomPause();
-        this.pomPhase = 'idle';
+        this.pomPhase     = 'idle';
         this.pomRemaining = 0;
-        this.pomUpdateBar();
+        this.pomRefreshAll();
     }
 
     private pomTick(): void {
         this.pomPause();
         if (this.pomPhase === 'work') {
-            new Notice('🍅 pomodoro done! Take a break.', 8000);
+            new Notice('Pomodoro complete! Take a break. 🍅', 8000);
             this.pomPhase     = 'break';
             this.pomRemaining = this.pomBreakMins * 60;
         } else {
-            new Notice('✅ break done! Ready for the next pomodoro?', 8000);
+            new Notice('Break over! Ready for the next pomodoro? ✅', 8000);
             this.pomPhase     = 'idle';
             this.pomRemaining = 0;
         }
-        this.pomUpdateBar();
-        // Refresh any open popover
+        this.pomRefreshAll();
         document.querySelectorAll('.floaty-hud-popover').forEach(el => el.remove());
     }
 
-    private pomUpdateBar(): void {
-        if (!this.pomBarItem) return;
-        const item = this.pomBarItem;
-        item.empty();
-
-        item.removeClass('pomodoro-work', 'pomodoro-break');
-
-        if (this.pomPhase === 'idle') {
-            item.createSpan({ text: '🍅' });
-            item.createSpan({ text: `${this.pomWorkMins}:00` });
-        } else {
-            const mins = Math.floor(this.pomRemaining / 60).toString().padStart(2, '0');
-            const secs = (this.pomRemaining % 60).toString().padStart(2, '0');
-            item.createSpan({ text: this.pomPhase === 'work' ? '🍅' : '☕' });
-            item.createSpan({ text: `${mins}:${secs}` });
-            item.addClass(this.pomPhase === 'work' ? 'pomodoro-work' : 'pomodoro-break');
-        }
-    }
+    // ── Pomodoro popover ──────────────────────────────────────────────────────
 
     private openPomodoroPopover(anchor: HTMLElement): void {
-        // If popover already open, close it
-        const existing = document.querySelector('.floaty-hud-popover');
-        if (existing) { existing.remove(); return; }
+        if (document.querySelector('.floaty-hud-popover')) {
+            document.querySelectorAll('.floaty-hud-popover').forEach(el => el.remove());
+            return;
+        }
 
         openPopover(anchor, (panel) => {
             panel.createEl('h3', { text: '🍅 pomodoro' });
 
-            // Big countdown
-            const countdown = panel.createEl('div', { cls: 'floaty-hud-countdown' });
+            const countdown  = panel.createEl('div', { cls: 'floaty-hud-countdown' });
             const phaseLabel = panel.createEl('div', { cls: 'floaty-hud-phase-label' });
 
-            const refreshCountdown = () => {
+            const refreshDisplay = () => {
                 countdown.removeClass('phase-work', 'phase-break');
                 if (this.pomPhase === 'idle') {
-                    const m = this.pomWorkMins.toString().padStart(2, '0');
-                    countdown.textContent = `${m}:00`;
+                    countdown.textContent  = `${String(this.pomWorkMins).padStart(2,'0')}:00`;
                     phaseLabel.textContent = 'Ready';
                 } else {
-                    const mins = Math.floor(this.pomRemaining / 60).toString().padStart(2, '0');
-                    const secs = (this.pomRemaining % 60).toString().padStart(2, '0');
-                    countdown.textContent = `${mins}:${secs}`;
+                    const m = Math.floor(this.pomRemaining / 60).toString().padStart(2, '0');
+                    const s = (this.pomRemaining % 60).toString().padStart(2, '0');
+                    countdown.textContent  = `${m}:${s}`;
                     phaseLabel.textContent = this.pomPhase === 'work' ? 'Focus' : 'Break';
                     countdown.addClass(this.pomPhase === 'work' ? 'phase-work' : 'phase-break');
                 }
             };
-            refreshCountdown();
+            refreshDisplay();
 
-            // Live-update the countdown inside the popover while it's open
-            const liveTimer = setInterval(refreshCountdown, 500);
-            panel.addEventListener('remove', () => clearInterval(liveTimer));
-            // Observe DOM removal for cleanup
+            // Live update while popover is open
+            const liveTimer = setInterval(refreshDisplay, 500);
             const obs = new MutationObserver(() => {
                 if (!document.contains(panel)) { clearInterval(liveTimer); obs.disconnect(); }
             });
@@ -196,37 +331,28 @@ export class FloatyHud {
 
             // Controls
             const controls = panel.createEl('div', { cls: 'floaty-hud-controls' });
-
-            const startPauseBtn = controls.createEl('div', {
-                cls: 'floaty-hud-btn primary',
+            const startBtn  = controls.createEl('div', {
+                cls:  'floaty-hud-btn primary',
                 text: this.pomTimer ? 'Pause' : (this.pomPhase === 'idle' ? 'Start' : 'Resume'),
             });
-            startPauseBtn.addEventListener('click', () => {
-                if (this.pomTimer) {
-                    this.pomPause();
-                    startPauseBtn.textContent = 'Resume';
-                } else {
-                    this.pomStart();
-                    startPauseBtn.textContent = 'Pause';
-                }
+            startBtn.addEventListener('click', () => {
+                if (this.pomTimer) { this.pomPause(); startBtn.textContent = 'Resume'; }
+                else               { this.pomStart(); startBtn.textContent = 'Pause'; }
             });
 
-            const resetBtn = controls.createEl('div', { cls: 'floaty-hud-btn', text: 'Reset' });
-            resetBtn.addEventListener('click', () => {
-                this.pomStop();
-                startPauseBtn.textContent = 'Start';
-                refreshCountdown();
-            });
+            controls.createEl('div', { cls: 'floaty-hud-btn', text: 'Reset' })
+                .addEventListener('click', () => {
+                    this.pomStop();
+                    startBtn.textContent = 'Start';
+                    refreshDisplay();
+                });
 
             panel.createEl('div', { cls: 'floaty-hud-sep' });
 
-            // Work duration slider
-            this.addSlider(panel, 'Work', 1, 90, this.pomWorkMins, 'min', (v) => {
+            this.addSlider(panel, 'Work',  1, 90, this.pomWorkMins,  'min', (v) => {
                 this.pomWorkMins = v;
-                if (this.pomPhase === 'idle') refreshCountdown();
+                if (this.pomPhase === 'idle') refreshDisplay();
             });
-
-            // Break duration slider
             this.addSlider(panel, 'Break', 1, 30, this.pomBreakMins, 'min', (v) => {
                 this.pomBreakMins = v;
             });
@@ -234,22 +360,17 @@ export class FloatyHud {
     }
 
     private addSlider(
-        parent: HTMLElement,
-        label: string,
-        min: number,
-        max: number,
-        value: number,
-        unit: string,
-        onChange: (v: number) => void
+        parent: HTMLElement, label: string, min: number, max: number,
+        value: number, unit: string, onChange: (v: number) => void
     ): void {
-        const row = parent.createEl('div', { cls: 'floaty-hud-setting-row' });
+        const row    = parent.createEl('div', { cls: 'floaty-hud-setting-row' });
         row.createEl('span', { cls: 'floaty-hud-setting-label', text: label });
         const slider = row.createEl('input');
         slider.type  = 'range';
         slider.min   = String(min);
         slider.max   = String(max);
         slider.value = String(value);
-        const valEl = row.createEl('span', { cls: 'floaty-hud-setting-value', text: `${value}${unit}` });
+        const valEl  = row.createEl('span', { cls: 'floaty-hud-setting-value', text: `${value}${unit}` });
         slider.addEventListener('input', () => {
             const v = Number(slider.value);
             valEl.textContent = `${v}${unit}`;
@@ -257,79 +378,13 @@ export class FloatyHud {
         });
     }
 
-    // ── Session timer ─────────────────────────────────────────────────────────
-
-    private mountSessionTimer(): void {
-        const item = this.plugin.addStatusBarItem();
-        item.addClass('floaty-hud-item');
-        this.sessionBarItem = item;
-        this.updateSessionBar();
-
-        this.sessionTimer = setInterval(() => this.updateSessionBar(), 1000);
-
-        item.addEventListener('click', () => {
-            // Click resets session timer
-            this.sessionStart = Date.now();
-            this.updateSessionBar();
-        });
-
-        item.setAttribute('aria-label', 'Session time (click to reset)');
-    }
-
-    private updateSessionBar(): void {
-        if (!this.sessionBarItem) return;
-        const elapsed = Math.floor((Date.now() - this.sessionStart) / 1000);
-        this.sessionBarItem.empty();
-        this.sessionBarItem.createSpan({ text: '⏱' });
-        this.sessionBarItem.createSpan({ text: this.formatDuration(elapsed) });
-    }
-
-    // ── File timer ────────────────────────────────────────────────────────────
-
-    private mountFileTimer(): void {
-        const item = this.plugin.addStatusBarItem();
-        item.addClass('floaty-hud-item');
-        this.fileBarItem = item;
-        this.updateFileBar();
-
-        this.fileTimer = setInterval(() => this.updateFileBar(), 1000);
-
-        // Track file opens
-        this.plugin.registerEvent(
-            this.plugin.app.workspace.on('file-open', (file: TFile | null) => {
-                const path = file?.path ?? null;
-                if (path !== this.currentFile) {
-                    this.currentFile = path;
-                    this.fileStart   = file ? Date.now() : null;
-                    this.updateFileBar();
-                }
-            })
-        );
-
-        item.setAttribute('aria-label', 'Time on current file');
-    }
-
-    private updateFileBar(): void {
-        if (!this.fileBarItem) return;
-        this.fileBarItem.empty();
-        this.fileBarItem.createSpan({ text: '📄' });
-        if (this.fileStart === null) {
-            this.fileBarItem.createSpan({ text: '--:--' });
-        } else {
-            const elapsed = Math.floor((Date.now() - this.fileStart) / 1000);
-            this.fileBarItem.createSpan({ text: this.formatDuration(elapsed) });
-        }
-    }
-
-    // ── Utils ─────────────────────────────────────────────────────────────────
+    // ── Util ──────────────────────────────────────────────────────────────────
 
     private formatDuration(totalSeconds: number): string {
         const h = Math.floor(totalSeconds / 3600);
         const m = Math.floor((totalSeconds % 3600) / 60);
         const s = totalSeconds % 60;
-        if (h > 0) {
-            return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 }

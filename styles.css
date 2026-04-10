@@ -315,8 +315,39 @@
 }
 .floaty-hud-item.pomodoro-work  { color: var(--color-red); }
 .floaty-hud-item.pomodoro-break { color: var(--color-green); }
+.floaty-hud-item.hud-hidden { display: none !important; }
 
-/* ── HUD popover panel ────────────────────────────────────────────────────── */
+/* ── Dock HUD section ─────────────────────────────────────────────────────── */
+
+.floaty-dock-hud-section { display: contents; }
+
+.floaty-dock-hud-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 6px;
+    height: 32px;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-monospace);
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 100ms ease, color 100ms ease,
+                transform 200ms cubic-bezier(0.34,1.56,0.64,1);
+    user-select: none;
+}
+.floaty-dock-hud-item:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    transform: scale(1.15) translateY(-3px);
+}
+.floaty-dock-hud-item:active { transform: scale(0.92) translateY(0); }
+.floaty-dock-hud-item.pomodoro-work  { color: var(--color-red); }
+.floaty-dock-hud-item.pomodoro-break { color: var(--color-green); }
+
+/* ── HUD popover ──────────────────────────────────────────────────────────── */
 
 .floaty-hud-popover {
     position: fixed;
@@ -334,7 +365,6 @@
     flex-direction: column;
     gap: 10px;
 }
-
 .floaty-hud-popover h3 {
     margin: 0 0 2px;
     font-size: 13px;
@@ -342,7 +372,6 @@
     color: var(--text-normal);
     font-family: var(--font-interface);
 }
-
 .floaty-hud-countdown {
     font-size: 36px;
     font-weight: 700;
@@ -355,7 +384,6 @@
 }
 .floaty-hud-countdown.phase-work  { color: var(--color-red); }
 .floaty-hud-countdown.phase-break { color: var(--color-green); }
-
 .floaty-hud-phase-label {
     text-align: center;
     font-size: 11px;
@@ -364,7 +392,6 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
-
 .floaty-hud-controls {
     display: flex;
     gap: 6px;
@@ -393,7 +420,6 @@
     border-color: transparent;
 }
 .floaty-hud-btn.primary:hover { filter: brightness(1.1); }
-
 .floaty-hud-setting-row {
     display: flex;
     align-items: center;
@@ -418,12 +444,8 @@
     min-width: 32px;
     text-align: right;
 }
-
 .floaty-hud-sep {
     height: 1px;
     background: var(--divider-color);
     margin: 0 -14px;
 }
-
-/* Positioning helper — panel starts invisible while measuring */
-.floaty-hud-popover.is-measuring { visibility: hidden; }

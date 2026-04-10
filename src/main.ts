@@ -68,6 +68,7 @@ export default class FloatyToolbarPlugin extends Plugin {
         await this.loadSettings();
         this.hud = new FloatyHud(this);
         this.hud.mount();
+        this.toolbar.hud = this.hud;
         this.addSettingTab(new FloatySettingTab(this.app, this));
 
         // Wire up pin toggle — instant switch, no reload needed
@@ -173,7 +174,9 @@ export default class FloatyToolbarPlugin extends Plugin {
         if (this.settings.dockedMode) {
             this.app.workspace.onLayoutReady(() => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (view) this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
+                if (view) {
+                    this.toolbar.show(view.editor, { x: 0, y: 0 }, this.settings);
+                }
             });
         }
     }

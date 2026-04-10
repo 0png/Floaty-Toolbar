@@ -5,6 +5,7 @@ import {
     getSelectionRect, CalloutType,
 } from './utils';
 import type { PluginSettings } from './main';
+import type { FloatyHud } from './hud';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,8 @@ export class FloatyToolbar {
 
     /** Callback to notify main.ts when pin is toggled */
     onPinToggle: ((docked: boolean) => void) | null = null;
+    /** HUD reference — set by main.ts after creating hud */
+    hud: FloatyHud | null = null;
 
     // ── Public ────────────────────────────────────────────────────────────────
 
@@ -168,6 +171,8 @@ export class FloatyToolbar {
 
         this.buildToolbarContent(dock, () => this.dockEditor!, settings, true);
         this.setupKeyboardNav(dock);
+        // Notify HUD to move into dock
+        this.hud?.setDockedMode(true, dock);
 
         // Rise animation
         requestAnimationFrame(() => {
@@ -225,6 +230,7 @@ export class FloatyToolbar {
     }
 
     private destroyDock(): void {
+        this.hud?.setDockedMode(false, null);
         if (this._onKeyDown)   document.removeEventListener('keydown',   this._onKeyDown, true);
         if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
         this._onKeyDown   = null;
@@ -238,6 +244,7 @@ export class FloatyToolbar {
     }
 
     destroyDockAnimated(onDone: () => void): void {
+        this.hud?.setDockedMode(false, null);
         if (!this.dockEl) { onDone(); return; }
         if (this._onKeyDown)   document.removeEventListener('keydown',   this._onKeyDown, true);
         if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
