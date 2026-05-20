@@ -41,7 +41,7 @@
     z-index: 10002;
     padding: 4px 8px;
     background: var(--background-modifier-message, #1e1e1e);
-    color: var(--text-normal, #fff);
+    color: var(--text-normal, #ffffff);
     font-size: 12px;
     font-family: var(--font-interface);
     border-radius: var(--radius-s);

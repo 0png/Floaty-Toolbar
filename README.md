@@ -35,7 +35,7 @@ A sleek, lightweight floating toolbar for Obsidian that appears whenever you sel
 
 ### Smart URL detection
 
-When enabled, clicking the link button reads your clipboard. If it contains a valid `https://` URL, that URL is used automatically instead of the `url` placeholder.
+When enabled, clicking the link button reads your clipboard. If it contains a valid `https://` URL, that URL is used automatically instead of the default `url` value in the inserted Markdown link.
 
 When disabled, a one-time tip notice will appear on first use to let you know the feature exists.
 
@@ -47,7 +47,7 @@ Pins the toolbar to the bottom centre of the screen. Toggle between modes using 
 
 ## Installation
 
-### Community plugins (coming soon)
+### Community plugins
 
 Submission to the Obsidian community plugin registry is in progress. Once approved:
 

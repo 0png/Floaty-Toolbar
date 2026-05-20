@@ -1,6 +1,6 @@
 {
   "name": "floaty-toolbar",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A sleek, modern floating selection toolbar for Obsidian.",
   "main": "main.js",
   "type": "module",
