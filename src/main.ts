@@ -9,12 +9,10 @@ import {
 
 export interface PluginSettings {
     dockedMode: boolean;
-    smartUrl:   boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
     dockedMode: false,
-    smartUrl:   false,
 };
 
 function getActiveDocument(): Document {
@@ -25,7 +23,7 @@ function getActiveWindow(): Window {
     return window.activeWindow;
 }
 
-// ─── Settings tab — only smartUrl here, dockedMode is toggled via pin button ──
+// ─── Settings tab — dockedMode is toggled via pin button ─────────────────────
 
 class FloatySettingTab extends PluginSettingTab {
     plugin: FloatyToolbarPlugin;
@@ -38,14 +36,6 @@ class FloatySettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Behavior')
             .setHeading();
-
-        new Setting(containerEl)
-            .setName('Smart URL detection')
-            .setDesc('When inserting a link, automatically paste a URL from your clipboard if one is detected. When disabled, a reminder notice will appear.')
-            .addToggle(t => t
-                .setValue(this.plugin.settings.smartUrl)
-                .onChange(async (v) => { this.plugin.settings.smartUrl = v; await this.plugin.saveSettings(); })
-            );
 
         // Read-only indicator for dock mode — user changes it via the pin button
         new Setting(containerEl)
@@ -112,7 +102,7 @@ export default class FloatyToolbarPlugin extends Plugin {
         this.addCommand({ id: 'floaty-strikethrough',     name: 'Strikethrough',    editorCallback: (e) => applyStrikethrough(e) });
         this.addCommand({ id: 'floaty-inline-code',       name: 'Inline code',      editorCallback: (e) => applyCode(e) });
         this.addCommand({ id: 'floaty-highlight',         name: 'Highlight',        editorCallback: (e) => applyHighlight(e) });
-        this.addCommand({ id: 'floaty-insert-link',       name: 'Insert link',      editorCallback: (e) => applyLink(e, this.settings.smartUrl) });
+        this.addCommand({ id: 'floaty-insert-link',       name: 'Insert link',      editorCallback: (e) => applyLink(e) });
         this.addCommand({ id: 'floaty-heading-1',         name: 'Heading 1',        editorCallback: (e) => applyHeading(e, 1) });
         this.addCommand({ id: 'floaty-heading-2',         name: 'Heading 2',        editorCallback: (e) => applyHeading(e, 2) });
         this.addCommand({ id: 'floaty-heading-3',         name: 'Heading 3',        editorCallback: (e) => applyHeading(e, 3) });

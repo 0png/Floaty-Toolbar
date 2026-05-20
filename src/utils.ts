@@ -1,6 +1,4 @@
-import { Editor, Notice } from 'obsidian';
-
-let smartUrlNoticeSeen = false;
+import { Editor } from 'obsidian';
 
 export function wrapSelection(editor: Editor, prefix: string, suffix?: string): void {
     const selected = editor.getSelection();
@@ -37,11 +35,7 @@ export function applyStrikethrough(editor: Editor): void { wrapSelection(editor,
 export function applyCode(editor: Editor): void          { wrapSelection(editor, '`'); }
 export function applyHighlight(editor: Editor): void     { wrapSelection(editor, '=='); }
 
-/**
- * Insert link. If smartUrl=true, reads clipboard and uses it if it's a valid URL.
- * If smartUrl=false, uses "url" placeholder and shows a one-time Notice nudge.
- */
-export async function applyLink(editor: Editor, smartUrl: boolean): Promise<void> {
+export function applyLink(editor: Editor): void {
     const selected = editor.getSelection();
     if (!selected) return;
 
@@ -52,30 +46,7 @@ export async function applyLink(editor: Editor, smartUrl: boolean): Promise<void
         return;
     }
 
-    let url = 'url';
-
-    if (smartUrl) {
-        try {
-            const clip = await navigator.clipboard.readText();
-            const trimmed = clip.trim();
-            // Validate it looks like a URL
-            if (/^https?:\/\/.+/.test(trimmed)) {
-                url = trimmed;
-            }
-        } catch {
-            // Clipboard read failed (permissions) — fall back to placeholder
-        }
-    } else {
-        if (!smartUrlNoticeSeen) {
-            smartUrlNoticeSeen = true;
-            new Notice(
-                'Tip: turn on "smart URL detection" in settings to paste a URL from clipboard. 💡',
-                6000
-            );
-        }
-    }
-
-    editor.replaceSelection(`[${selected}](${url})`);
+    editor.replaceSelection(`[${selected}](url)`);
 }
 
 export function applyHeading(editor: Editor, level: 0 | 1 | 2 | 3 | 4): void {

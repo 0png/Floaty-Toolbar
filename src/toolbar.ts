@@ -20,7 +20,7 @@ const ACTIONS: IconAction[] = [
     { icon: 'strikethrough', tooltip: 'Strikethrough', action: (e)    => applyStrikethrough(e) },
     { icon: 'code',          tooltip: 'Inline Code',   action: (e)    => applyCode(e) },
     { icon: 'highlighter',   tooltip: 'Highlight',     action: (e)    => applyHighlight(e) },
-    { icon: 'link',          tooltip: 'Insert Link',   action: (e, s) => applyLink(e, s.smartUrl) },
+    { icon: 'link',          tooltip: 'Insert Link',   action: (e)    => applyLink(e) },
 ];
 
 const HEADING_OPTIONS: { label: string; level: 0 | 1 | 2 | 3 | 4 }[] = [

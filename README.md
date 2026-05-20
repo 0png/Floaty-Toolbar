@@ -8,7 +8,6 @@ A sleek, lightweight floating toolbar for Obsidian that appears whenever you sel
 
 - **Floating selection toolbar** — pops up above your selection the moment you highlight text
 - **Dock mode** — pin the toolbar to the bottom of the screen as a persistent pill
-- **Smart URL** — automatically pastes a URL from your clipboard when inserting a link
 - **Toggle formatting** — clicking a format button a second time removes the formatting
 - **Keyboard accessible** — navigate with `Tab` / `Shift+Tab`, activate with `Enter` or `Space`, dismiss with `Escape`
 - **Theme compatible** — uses Obsidian CSS variables throughout, works with any community theme
@@ -32,12 +31,6 @@ A sleek, lightweight floating toolbar for Obsidian that appears whenever you sel
 ---
 
 ## Settings
-
-### Smart URL detection
-
-When enabled, clicking the link button reads your clipboard. If it contains a valid `https://` URL, that URL is used automatically instead of the default `url` value in the inserted Markdown link.
-
-When disabled, a one-time tip notice will appear on first use to let you know the feature exists.
 
 ### Dock mode
 
