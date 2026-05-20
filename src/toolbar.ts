@@ -47,32 +47,46 @@ const GAP = 10;
 let tooltipEl: HTMLElement | null = null;
 let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
 
+function getActiveDocument(): Document {
+    return window.activeDocument;
+}
+
+function getActiveWindow(): Window {
+    return window.activeWindow;
+}
+
+function setFloatingPosition(el: HTMLElement, left: number, top: number): void {
+    el.setCssProps({
+        left: `${left}px`,
+        top: `${top}px`,
+    });
+}
+
 function showTooltip(text: string, anchor: HTMLElement, above: boolean): void {
     hideTooltip();
-    tooltipTimer = setTimeout(() => {
-        const tip = document.body.createEl('div', { cls: 'floaty-custom-tooltip', text });
+    tooltipTimer = getActiveWindow().setTimeout(() => {
+        const tip = getActiveDocument().body.createDiv({ cls: 'floaty-custom-tooltip', text });
         tooltipEl = tip;
 
         const r = anchor.getBoundingClientRect();
         tip.addClass('floaty-measuring');
 
-        requestAnimationFrame(() => {
+        getActiveWindow().requestAnimationFrame(() => {
             const tw = tip.offsetWidth;
             let left = r.left + r.width / 2 - tw / 2;
-            left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+            left = Math.max(8, Math.min(left, getActiveWindow().innerWidth - tw - 8));
             const top = above
                 ? r.top - tip.offsetHeight - 6
                 : r.bottom + 6;
 
-            tip.style.left       = `${left}px`;
-            tip.style.top        = `${top}px`;
+            setFloatingPosition(tip, left, top);
             tip.removeClass('floaty-measuring');
         });
     }, 400);
 }
 
 function hideTooltip(): void {
-    if (tooltipTimer !== null) { clearTimeout(tooltipTimer); tooltipTimer = null; }
+    if (tooltipTimer !== null) { getActiveWindow().clearTimeout(tooltipTimer); tooltipTimer = null; }
     tooltipEl?.remove();
     tooltipEl = null;
 }
@@ -87,12 +101,12 @@ function attachTooltip(el: HTMLElement, text: string, above: boolean): void {
 
 function createChevronSvg(): SVGSVGElement {
     const NS  = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
+    const svg = getActiveDocument().createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('fill', 'none');
     svg.setAttribute('stroke', 'currentColor');
     svg.classList.add('floaty-chevron');
-    const path = document.createElementNS(NS, 'path');
+    const path = getActiveDocument().createElementNS(NS, 'path');
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('stroke-linejoin', 'round');
     path.setAttribute('d', 'M6 9l6 6 6-6');
@@ -118,7 +132,7 @@ export class FloatyToolbar {
     private openDropdown: HTMLElement | null = null;
 
     /** Callback to notify main.ts when pin is toggled */
-    onPinToggle: ((docked: boolean) => void) | null = null;
+    onPinToggle: ((docked: boolean) => void | Promise<void>) | null = null;
 
     // ── Public ────────────────────────────────────────────────────────────────
 
@@ -163,15 +177,15 @@ export class FloatyToolbar {
             return;
         }
 
-        const dock = document.body.createEl('div', { cls: 'floaty-dock' });
+        const dock = getActiveDocument().body.createDiv({ cls: 'floaty-dock' });
         this.dockEl = dock;
 
         this.buildToolbarContent(dock, () => this.dockEditor!, settings, true);
         this.setupKeyboardNav(dock);
 
         // Rise animation
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
+        getActiveWindow().requestAnimationFrame(() => {
+            getActiveWindow().requestAnimationFrame(() => {
                 dock.addClass('dock-rising');
                 dock.addEventListener('animationend', () => {
                     dock.removeClass('dock-rising');
@@ -188,24 +202,24 @@ export class FloatyToolbar {
             if (this.dockEl?.contains(e.target as Node)) return;
             this.dockAutoHide();
         };
-        document.addEventListener('keydown', this._onKeyDown, true);
+        getActiveDocument().addEventListener('keydown', this._onKeyDown, true);
 
         // Reveal on mouse near bottom
         this._onMouseMove = (e: MouseEvent) => {
-            if (e.clientY > window.innerHeight - 80) this.dockReveal();
+            if (e.clientY > getActiveWindow().innerHeight - 80) this.dockReveal();
         };
-        document.addEventListener('mousemove', this._onMouseMove, { passive: true });
+        getActiveDocument().addEventListener('mousemove', this._onMouseMove, { passive: true });
 
         // Hovering dock cancels hide
         dock.addEventListener('mouseenter', () => {
-            if (this.dockAutoHideTimer !== null) { clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
+            if (this.dockAutoHideTimer !== null) { getActiveWindow().clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
             this.dockReveal();
         });
     }
 
     private dockReveal(): void {
         if (!this.dockEl) return;
-        if (this.dockAutoHideTimer !== null) { clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
+        if (this.dockAutoHideTimer !== null) { getActiveWindow().clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
         if (this.dockIsVisible) return;
         this.dockEl.removeClass('dock-hidden');
         this.dockEl.addClass('dock-visible');
@@ -214,8 +228,8 @@ export class FloatyToolbar {
 
     private dockAutoHide(): void {
         if (!this.dockEl || !this.dockIsVisible) return;
-        if (this.dockAutoHideTimer !== null) clearTimeout(this.dockAutoHideTimer);
-        this.dockAutoHideTimer = setTimeout(() => {
+        if (this.dockAutoHideTimer !== null) getActiveWindow().clearTimeout(this.dockAutoHideTimer);
+        this.dockAutoHideTimer = getActiveWindow().setTimeout(() => {
             if (!this.dockEl) return;
             this.dockEl.removeClass('dock-visible');
             this.dockEl.addClass('dock-hidden');
@@ -225,11 +239,11 @@ export class FloatyToolbar {
     }
 
     private destroyDock(): void {
-        if (this._onKeyDown)   document.removeEventListener('keydown',   this._onKeyDown, true);
-        if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
+        if (this._onKeyDown)   getActiveDocument().removeEventListener('keydown', this._onKeyDown, true);
+        if (this._onMouseMove) getActiveDocument().removeEventListener('mousemove', this._onMouseMove);
         this._onKeyDown   = null;
         this._onMouseMove = null;
-        if (this.dockAutoHideTimer !== null) { clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
+        if (this.dockAutoHideTimer !== null) { getActiveWindow().clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
         this.dockEl?.remove();
         this.dockEl       = null;
         this.dockEditor   = null;
@@ -239,18 +253,18 @@ export class FloatyToolbar {
 
     destroyDockAnimated(onDone: () => void): void {
         if (!this.dockEl) { onDone(); return; }
-        if (this._onKeyDown)   document.removeEventListener('keydown',   this._onKeyDown, true);
-        if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
+        if (this._onKeyDown)   getActiveDocument().removeEventListener('keydown', this._onKeyDown, true);
+        if (this._onMouseMove) getActiveDocument().removeEventListener('mousemove', this._onMouseMove);
         this._onKeyDown   = null;
         this._onMouseMove = null;
-        if (this.dockAutoHideTimer !== null) { clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
+        if (this.dockAutoHideTimer !== null) { getActiveWindow().clearTimeout(this.dockAutoHideTimer); this.dockAutoHideTimer = null; }
         const el = this.dockEl;
         let done = false;
         const finish = () => { if (done) return; done = true; el.remove(); onDone(); };
         el.removeClass('dock-visible', 'dock-hidden', 'dock-rising');
         el.addClass('dock-falling');
         el.addEventListener('animationend', finish, { once: true });
-        setTimeout(finish, 400); // safety fallback
+        getActiveWindow().setTimeout(finish, 400); // safety fallback
         this.dockEl       = null;
         this.dockEditor   = null;
         this.dockSettings = null;
@@ -260,12 +274,12 @@ export class FloatyToolbar {
     // ── Floating toolbar ──────────────────────────────────────────────────────
 
     private showFloating(editor: Editor, mouse: { x: number; y: number }, settings: PluginSettings): void {
-        if (this.hideTimer !== null) { clearTimeout(this.hideTimer); this.hideTimer = null; }
+        if (this.hideTimer !== null) { getActiveWindow().clearTimeout(this.hideTimer); this.hideTimer = null; }
 
         const alreadyVisible = this.containerEl !== null;
 
         if (!alreadyVisible) {
-            this.containerEl = document.body.createEl('div', { cls: 'floaty-toolbar' });
+            this.containerEl = getActiveDocument().body.createDiv({ cls: 'floaty-toolbar' });
             this.buildToolbarContent(this.containerEl, () => editor, settings, false);
             this.setupKeyboardNav(this.containerEl);
         } else {
@@ -276,8 +290,8 @@ export class FloatyToolbar {
         this.positionToolbar(mouse);
 
         if (!alreadyVisible) {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => { this.containerEl?.addClass('is-active'); });
+            getActiveWindow().requestAnimationFrame(() => {
+                getActiveWindow().requestAnimationFrame(() => { this.containerEl?.addClass('is-active'); });
             });
         }
     }
@@ -288,9 +302,9 @@ export class FloatyToolbar {
         this.containerEl = null;
         el.removeClass('is-active');
         el.addClass('is-hiding');
-        this.hideTimer = setTimeout(() => { el.remove(); this.hideTimer = null; }, 200);
+        this.hideTimer = getActiveWindow().setTimeout(() => { el.remove(); this.hideTimer = null; }, 200);
         el.addEventListener('animationend', () => {
-            if (this.hideTimer !== null) { clearTimeout(this.hideTimer); this.hideTimer = null; }
+            if (this.hideTimer !== null) { getActiveWindow().clearTimeout(this.hideTimer); this.hideTimer = null; }
             el.remove();
         }, { once: true });
     }
@@ -307,17 +321,17 @@ export class FloatyToolbar {
 
         this.createActionItem(container, ACTIONS[0], getEditor, settings, isDock);
         this.createActionItem(container, ACTIONS[1], getEditor, settings, isDock);
-        container.createEl('div', { cls: 'floaty-divider' });
+        container.createDiv({ cls: 'floaty-divider' });
         this.createActionItem(container, ACTIONS[2], getEditor, settings, isDock);
         this.createActionItem(container, ACTIONS[3], getEditor, settings, isDock);
-        container.createEl('div', { cls: 'floaty-divider' });
+        container.createDiv({ cls: 'floaty-divider' });
         this.createActionItem(container, ACTIONS[4], getEditor, settings, isDock);
         this.createActionItem(container, ACTIONS[5], getEditor, settings, isDock);
-        container.createEl('div', { cls: 'floaty-divider' });
+        container.createDiv({ cls: 'floaty-divider' });
         this.createHeadingDropdown(container, getEditor, above, isDock);
-        container.createEl('div', { cls: 'floaty-divider' });
+        container.createDiv({ cls: 'floaty-divider' });
         this.createCalloutDropdown(container, getEditor, above, isDock);
-        container.createEl('div', { cls: 'floaty-divider' });
+        container.createDiv({ cls: 'floaty-divider' });
 
         // Pin button — always last
         this.createPinButton(container, settings, isDock);
@@ -326,7 +340,7 @@ export class FloatyToolbar {
     // ── Pin button ────────────────────────────────────────────────────────────
 
     private createPinButton(container: HTMLElement, settings: PluginSettings, isDock: boolean): void {
-        const btn = container.createEl('div', {
+        const btn = container.createDiv({
             cls: 'floaty-pin-btn' + (isDock ? ' is-pinned' : ''),
             attr: { role: 'button', tabindex: '0' },
         });
@@ -336,7 +350,7 @@ export class FloatyToolbar {
         const toggle = () => {
             const newDocked = !settings.dockedMode;
             hideTooltip();
-            if (this.onPinToggle) this.onPinToggle(newDocked);
+            if (this.onPinToggle) void this.onPinToggle(newDocked);
         };
 
         btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); toggle(); });
@@ -360,7 +374,7 @@ export class FloatyToolbar {
             );
             if (!focusable.length) return;
 
-            const idx = focusable.indexOf(document.activeElement as HTMLElement);
+            const idx = focusable.indexOf(getActiveDocument().activeElement as HTMLElement);
             e.preventDefault();
             e.stopPropagation();
 
@@ -386,41 +400,40 @@ export class FloatyToolbar {
         this.closeDropdown();
         triggerEl.addClass('is-open');
 
-        const panel = document.body.createEl('div', { cls: 'floaty-dropdown' });
+        const panel = getActiveDocument().body.createDiv({ cls: 'floaty-dropdown' });
         this.openDropdown = panel;
 
         panel.addClass('floaty-measuring');
 
         const tr = triggerEl.getBoundingClientRect();
         let left = tr.left;
-        panel.style.left = `${left}px`;
+        setFloatingPosition(panel, left, 0);
 
-        requestAnimationFrame(() => {
+        getActiveWindow().requestAnimationFrame(() => {
             const pr = panel.getBoundingClientRect();
-            if (left + pr.width > window.innerWidth - 8) left = window.innerWidth - pr.width - 8;
+            if (left + pr.width > getActiveWindow().innerWidth - 8) left = getActiveWindow().innerWidth - pr.width - 8;
             left = Math.max(8, left);
 
             const top = openUpward
                 ? tr.top - pr.height - 8
                 : tr.bottom + 6;
 
-            panel.style.left       = `${left}px`;
-            panel.style.top        = `${Math.max(8, top)}px`;
+            setFloatingPosition(panel, left, Math.max(8, top));
             panel.removeClass('floaty-measuring');
         });
 
         const onOutside = (e: MouseEvent) => {
             if (!panel.contains(e.target as Node) && !triggerEl.contains(e.target as Node)) {
                 this.closeDropdown();
-                document.removeEventListener('mousedown', onOutside, true);
+                getActiveDocument().removeEventListener('mousedown', onOutside, true);
             }
         };
-        setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+        getActiveWindow().setTimeout(() => getActiveDocument().addEventListener('mousedown', onOutside, true), 0);
 
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') { this.closeDropdown(); document.removeEventListener('keydown', onKey, true); }
+            if (e.key === 'Escape') { this.closeDropdown(); getActiveDocument().removeEventListener('keydown', onKey, true); }
         };
-        document.addEventListener('keydown', onKey, true);
+        getActiveDocument().addEventListener('keydown', onKey, true);
 
         return panel;
     }
@@ -428,7 +441,7 @@ export class FloatyToolbar {
     // ── Heading dropdown ──────────────────────────────────────────────────────
 
     private createHeadingDropdown(container: HTMLElement, getEditor: () => Editor, openUpward: boolean, isDock: boolean): void {
-        const trigger = container.createEl('div', {
+        const trigger = container.createDiv({
             cls: 'floaty-dropdown-trigger',
             attr: { role: 'button', tabindex: '0' },
         });
@@ -440,11 +453,11 @@ export class FloatyToolbar {
             if (trigger.hasClass('is-open')) { this.closeDropdown(); return; }
             const panel = this.openDropdownPanel(trigger, openUpward);
             for (const opt of HEADING_OPTIONS) {
-                const item = panel.createEl('div', { cls: 'floaty-dropdown-item' });
+                const item = panel.createDiv({ cls: 'floaty-dropdown-item' });
                 if (opt.level === 0) {
                     item.createSpan({ cls: 'floaty-heading-plain', text: 'Plain text' });
                 } else {
-                    item.createEl('span', { cls: 'floaty-heading-badge', text: `H${opt.level}` });
+                    item.createSpan({ cls: 'floaty-heading-badge', text: `H${opt.level}` });
                     item.createSpan({ text: `Heading ${opt.level}` });
                 }
                 item.addEventListener('mousedown', (e) => {
@@ -462,7 +475,7 @@ export class FloatyToolbar {
     // ── Callout dropdown ──────────────────────────────────────────────────────
 
     private createCalloutDropdown(container: HTMLElement, getEditor: () => Editor, openUpward: boolean, isDock: boolean): void {
-        const trigger = container.createEl('div', {
+        const trigger = container.createDiv({
             cls: 'floaty-dropdown-trigger',
             attr: { role: 'button', tabindex: '0' },
         });
@@ -474,8 +487,8 @@ export class FloatyToolbar {
             if (trigger.hasClass('is-open')) { this.closeDropdown(); return; }
             const panel = this.openDropdownPanel(trigger, openUpward);
             for (const opt of CALLOUT_OPTIONS) {
-                const item = panel.createEl('div', { cls: 'floaty-dropdown-item' });
-                const iconWrap = item.createEl('span', { cls: `floaty-callout-icon-${opt.type}` });
+                const item = panel.createDiv({ cls: 'floaty-dropdown-item' });
+                const iconWrap = item.createSpan({ cls: `floaty-callout-icon-${opt.type}` });
                 setIcon(iconWrap, opt.icon);
                 item.createSpan({ text: opt.label });
                 item.addEventListener('mousedown', (e) => {
@@ -510,11 +523,10 @@ export class FloatyToolbar {
 
         let left = anchorX - tbW / 2;
         let top  = anchorTop - tbH - GAP;
-        left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
+        left = Math.max(8, Math.min(left, getActiveWindow().innerWidth - tbW - 8));
         if (top < 8) top = anchorBottom + GAP;
 
-        this.containerEl.style.left = `${left}px`;
-        this.containerEl.style.top  = `${top}px`;
+        setFloatingPosition(this.containerEl, left, top);
     }
 
     // ── Action button ─────────────────────────────────────────────────────────
@@ -526,7 +538,7 @@ export class FloatyToolbar {
         settings: PluginSettings,
         isDock: boolean
     ): void {
-        const item = container.createEl('div', {
+        const item = container.createDiv({
             cls: 'floaty-action-item',
             attr: { role: 'button', tabindex: '0' },
         });
@@ -537,7 +549,7 @@ export class FloatyToolbar {
         const execute = () => {
             const result = cfg.action(getEditor(), settings);
             if (!isDock) {
-                if (result instanceof Promise) void result.then(() => this.hideFloating());
+                if (result instanceof Promise) void result.then(() => this.hideFloating()).catch(() => {});
                 else this.hideFloating();
             }
         };
