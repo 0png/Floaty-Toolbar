@@ -283,6 +283,11 @@ export default class FloatyToolbarPlugin extends Plugin {
             if (evt.key === 'Escape') this.toolbar.hide();
         });
 
+        this.registerDomEvent(getActiveWindow(), 'wheel', () => {
+            if (this.settings.dockedMode) return;
+            this.toolbar.hide();
+        }, { passive: true });
+
         if (this.settings.dockedMode) {
             this.app.workspace.onLayoutReady(() => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);

@@ -206,7 +206,9 @@
 
 /* The wrapper is the invisible hit-testing shell around each button */
 .floaty-item-wrapper {
-    display: contents; /* invisible in layout — only data-floaty-id matters */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
 }
 
@@ -427,11 +429,15 @@ body.floaty-dragging .floaty-item-wrapper {
 .floaty-hud-item:hover          { background: var(--background-modifier-hover); color: var(--text-normal); }
 .floaty-hud-item.pomodoro-work  { color: var(--color-red); }
 .floaty-hud-item.pomodoro-break { color: var(--color-green); }
-.floaty-hud-item.hud-hidden     { display: none !important; }
+.status-bar-item.floaty-hud-item.hud-hidden { display: none; }
 
 /* ── Dock HUD section ─────────────────────────────────────────────────────── */
 
-.floaty-dock-hud-section { display: contents; }
+.floaty-dock-hud-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
 
 .floaty-dock-hud-item {
     display: flex;
