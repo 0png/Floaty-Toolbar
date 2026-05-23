@@ -12,12 +12,16 @@ export interface PluginSettings {
     dockedMode: boolean;
     smartUrl: boolean;
     buttonOrder: ToolbarItemId[];
+    pomodoroWorkMins: number;
+    pomodoroBreakMins: number;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
     dockedMode: false,
     smartUrl: false,
     buttonOrder: [...DEFAULT_BUTTON_ORDER],
+    pomodoroWorkMins: 25,
+    pomodoroBreakMins: 5,
 };
 
 function getActiveDocument(): Document {
@@ -55,6 +59,34 @@ class FloatySettingTab extends PluginSettingTab {
             .addToggle(t => t
                 .setValue(this.plugin.settings.dockedMode)
                 .setDisabled(true)
+            );
+
+        new Setting(containerEl)
+            .setName('Pomodoro work minutes')
+            .setDesc('Default focus duration used by the dock and status bar pomodoro timer.')
+            .addText(text => text
+                .setPlaceholder('25')
+                .setValue(String(this.plugin.settings.pomodoroWorkMins))
+                .onChange(async (value) => {
+                    const mins = Number.parseInt(value, 10);
+                    if (!Number.isFinite(mins)) return;
+                    this.plugin.settings.pomodoroWorkMins = Math.max(1, Math.min(90, mins));
+                    await this.plugin.saveSettings();
+                })
+            );
+
+        new Setting(containerEl)
+            .setName('Pomodoro break minutes')
+            .setDesc('Default break duration used by the dock and status bar pomodoro timer.')
+            .addText(text => text
+                .setPlaceholder('5')
+                .setValue(String(this.plugin.settings.pomodoroBreakMins))
+                .onChange(async (value) => {
+                    const mins = Number.parseInt(value, 10);
+                    if (!Number.isFinite(mins)) return;
+                    this.plugin.settings.pomodoroBreakMins = Math.max(1, Math.min(30, mins));
+                    await this.plugin.saveSettings();
+                })
             );
 
         new Setting(containerEl)
@@ -314,5 +346,6 @@ export default class FloatyToolbarPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+        this.hud?.refreshSettings();
     }
 }

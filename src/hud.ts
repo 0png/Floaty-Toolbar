@@ -1,4 +1,5 @@
-import { Notice, Plugin, TFile } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
+import type FloatyToolbarPlugin from './main';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,13 +37,11 @@ function openPopover(anchorEl: HTMLElement, build: (panel: HTMLElement) => void)
 // ─── FloatyHud ────────────────────────────────────────────────────────────────
 
 export class FloatyHud {
-    private plugin: Plugin;
+    private plugin: FloatyToolbarPlugin;
 
     // Pomodoro
     private pomPhase: PomodoroPhase = 'idle';
     private pomRemaining = 0;
-    private pomWorkMins  = 25;
-    private pomBreakMins = 5;
     private pomTimer: ReturnType<typeof setInterval> | null = null;
 
     // Status bar elements (always created, shown/hidden via CSS)
@@ -63,7 +62,7 @@ export class FloatyHud {
     private fileTimer: ReturnType<typeof setInterval> | null = null;
     private currentFile: string | null = null;
 
-    constructor(plugin: Plugin) {
+    constructor(plugin: FloatyToolbarPlugin) {
         this.plugin = plugin;
     }
 
@@ -73,6 +72,24 @@ export class FloatyHud {
     mount(): void {
         this.mountStatusBarItems();
         this.startTimers();
+    }
+
+    refreshSettings(): void {
+        const workMins = this.pomWorkMins;
+        const breakMins = this.pomBreakMins;
+
+        if (this.pomPhase === 'idle') {
+            this.pomRefreshAll();
+            return;
+        }
+
+        if (this.pomPhase === 'work') {
+            this.pomRemaining = Math.min(this.pomRemaining, workMins * 60);
+        } else if (this.pomPhase === 'break') {
+            this.pomRemaining = Math.min(this.pomRemaining, breakMins * 60);
+        }
+
+        this.pomRefreshAll();
     }
 
     /**
@@ -252,6 +269,14 @@ export class FloatyHud {
         this.pomRenderInto(this.pomDockItem);
     }
 
+    private get pomWorkMins(): number {
+        return this.plugin.settings.pomodoroWorkMins;
+    }
+
+    private get pomBreakMins(): number {
+        return this.plugin.settings.pomodoroBreakMins;
+    }
+
     // ── Pomodoro logic ────────────────────────────────────────────────────────
 
     private pomStart(): void {
@@ -350,11 +375,14 @@ export class FloatyHud {
             panel.createEl('div', { cls: 'floaty-hud-sep' });
 
             this.addSlider(panel, 'Work',  1, 90, this.pomWorkMins,  'min', (v) => {
-                this.pomWorkMins = v;
-                if (this.pomPhase === 'idle') refreshDisplay();
+                this.plugin.settings.pomodoroWorkMins = v;
+                void this.plugin.saveSettings();
+                refreshDisplay();
             });
             this.addSlider(panel, 'Break', 1, 30, this.pomBreakMins, 'min', (v) => {
-                this.pomBreakMins = v;
+                this.plugin.settings.pomodoroBreakMins = v;
+                void this.plugin.saveSettings();
+                refreshDisplay();
             });
         });
     }
