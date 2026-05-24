@@ -92,18 +92,6 @@ All formatting actions are available as Obsidian commands (searchable via `Ctrl/
 
 ---
 
-## Screenshot Guide
-
-If you want to update the README screenshots:
-
-1. Put the floating toolbar screenshot at `assets/screenshots/floating-toolbar.png`
-2. Put the dock toolbar screenshot at `assets/screenshots/dock-toolbar.png`
-3. Commit those files with the README
-
-You can use `.png`, but if you prefer another format, update the image paths in this README to match.
-
----
-
 ## Contributing
 
 Bug reports, feature requests, and pull requests are welcome. Please open an [issue](https://github.com/0png/floaty-toolbar/issues) to discuss significant changes before submitting a PR.
